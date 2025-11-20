@@ -10,9 +10,7 @@ struct PostgresDatabase {
     pool: PgPool,
 }
 
-impl PostgresDatabase {
-    fn new() -> PostgresDatabase {}
-}
+impl PostgresDatabase {}
 
 impl UserDatabase for PostgresDatabase {
     async fn create_user(&self, user: User) -> UserDatabaseResult<()> {
