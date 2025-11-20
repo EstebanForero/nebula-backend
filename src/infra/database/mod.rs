@@ -5,8 +5,13 @@ use crate::{
     use_cases::user_database::{UserDatabase, UserDatabaseResult},
 };
 
+#[derive(Clone)]
 struct PostgresDatabase {
     pool: PgPool,
+}
+
+impl PostgresDatabase {
+    fn new() -> PostgresDatabase {}
 }
 
 impl UserDatabase for PostgresDatabase {
