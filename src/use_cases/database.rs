@@ -5,7 +5,6 @@ use crate::domain::user::User;
 
 pub type DatabaseResult<T> = Result<T, DatabaseError>;
 
-#[async_trait]
 pub trait Database {
     async fn create_user(user: User) -> DatabaseResult<()>;
 }
