@@ -2,12 +2,10 @@ use thiserror::Error;
 
 use crate::domain::user::User;
 
-pub type UserDatabaseResult<T> = Result<T, UserDatabaseError>;
+pub type RoomDatabaseResult<T> = Result<T, UserDatabaseError>;
 
 pub trait UserDatabase: Clone + Send + Sync {
-    async fn create_user(&self, user: User) -> UserDatabaseResult<()>;
-
-    async fn get_user_by_username(&self, user_name: String) -> UserDatabaseResult<User>;
+    async fn create_user(&self, user: User) -> RoomDatabaseResult<()>;
 }
 
 #[derive(Debug, Error)]
