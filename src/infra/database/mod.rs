@@ -3,7 +3,7 @@ use sqlx::{PgPool, migrate::Migrator, postgres::PgPoolOptions};
 
 use crate::{
     domain::user::User,
-    use_cases::user_database::{UserDatabase, UserDatabaseResult},
+    use_cases::user_database::{UserDatabase, UserDatabaseError, UserDatabaseResult},
 };
 
 #[derive(Clone)]
@@ -27,12 +27,23 @@ impl PostgresDatabase {
 
 impl UserDatabase for PostgresDatabase {
     async fn create_user(&self, user: User) -> UserDatabaseResult<()> {
-        //sqlx::query!("")
-
-        todo!()
+        sqlx::query!(
+            "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, $4)",
+            user.id,
+            user.username,
+            user.email,
+            user.password_hash
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+        .map(|_| ())
     }
 
-    async fn get_user_by_username(&self, user_name: String) -> UserDatabaseResult<User> {
-        todo!()
+    async fn get_user_by_username(&self, username: String) -> UserDatabaseResult<User> {
+        sqlx::query_as!(User, "SELECT * FROM users WHERE username = $1", username)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
     }
 }

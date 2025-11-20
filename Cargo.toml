@@ -11,7 +11,7 @@ dotenvy = "0.15.7"
 envy = "0.4.2"
 mockall = "0.13.1"
 serde = { version = "1.0.228", features = ["derive"] }
-sqlx = { version = "0.8.6", features = ["chrono", "postgres", "uuid"] }
+sqlx = { version = "0.8.6", features = ["chrono", "postgres", "runtime-tokio", "uuid"] }
 thiserror = "2.0.17"
 tokio = { version = "1.48.0", features = ["full"] }
 tower-http = { version = "0.6.6", features = ["cors"] }
