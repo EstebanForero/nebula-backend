@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use dotenvy::dotenv;
 use serde::Deserialize;
 
-use crate::infra::database::PostgresDatabase;
+use crate::{infra::database::PostgresDatabase, use_cases::room_database::UserDatabase};
 
 mod domain;
 mod infra;
