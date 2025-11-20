@@ -12,6 +12,6 @@ trait Database {
 
 #[derive(Debug, Error)]
 pub enum DatabaseError {
-    #[error("UnknownError")]
-    UnknownError,
+    #[error("Internal DB error: {0}")]
+    InternalDBError(String),
 }
