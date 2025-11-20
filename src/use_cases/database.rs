@@ -3,10 +3,10 @@ use thiserror::Error;
 
 use crate::domain::user::User;
 
-type DatabaseResult<T> = Result<T, DatabaseError>;
+pub type DatabaseResult<T> = Result<T, DatabaseError>;
 
 #[async_trait]
-trait Database {
+pub trait Database {
     async fn create_user(user: User) -> DatabaseResult<()>;
 }
 
