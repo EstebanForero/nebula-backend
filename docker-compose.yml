@@ -1,0 +1,66 @@
+# docker-compose.yml
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:18.1-alpine    # Latest stable: 18.1 (Nov 13, 2025)
+    container_name: nebula-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nebula
+      POSTGRES_USER: nebula
+      POSTGRES_PASSWORD: nebula123  # Change in prod!
+    ports:
+      - "5432:5432"                 # Expose for local tools like pgAdmin
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nebula -d nebula"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:8.0-alpine        # Latest stable: 8.0 (Nov 4, 2025)
+    container_name: nebula-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning  # Basic persistence config
+    ports:
+      - "6379:6379"                # Expose for redis-cli or clients
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:4.1.5-management-alpine  # Latest stable: 4.1.5 (Oct 28, 2025) with management UI
+    container_name: nebula-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: nebula
+      RABBITMQ_DEFAULT_PASS: nebula123  # Change in prod!
+      RABBITMQ_DEFAULT_VHOST: nebula
+    ports:
+      - "5672:5672"                 # AMQP protocol
+      - "15672:15672"               # Management UI[](http://localhost:15672)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
