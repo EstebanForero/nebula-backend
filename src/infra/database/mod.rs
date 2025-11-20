@@ -10,5 +10,7 @@ struct PostgresDatabase {
 }
 
 impl UserDatabase for PostgresDatabase {
-    async fn create_user(user: User) -> UserDatabaseResult<()> {}
+    async fn create_user(&self, user: User) -> UserDatabaseResult<()> {
+        todo!()
+    }
 }
