@@ -201,7 +201,7 @@ impl RoomDatabase for PostgresDatabase {
     async fn get_room_messages(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<Message>> {
         let messages = sqlx::query_as!(
             Message,
-            "SELECT * FROM messages WHERE room_id = $1",
+            "SELECT * FROM messages WHERE room_id = $1 ORDER BY created_at DESC",
             room_id
         )
         .fetch_all(&self.pool)
@@ -209,5 +209,20 @@ impl RoomDatabase for PostgresDatabase {
         .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
 
         Ok(messages)
+    }
+
+    async fn create_message(&self, message: Message) -> RoomDatabaseResult<()> {
+        sqlx::query!(
+            "INSERT INTO messages (id, room_id, sender_id, content) VALUES ($1, $2, $3, $4)",
+            message.id,
+            message.room_id,
+            message.sender_id,
+            message.content
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(())
     }
 }

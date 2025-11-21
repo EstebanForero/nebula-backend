@@ -6,6 +6,8 @@ use crate::domain::user::User;
 
 pub type UserDatabaseResult<T> = Result<T, UserDatabaseError>;
 
+pub trait UserDatabaseClone: UserDatabase + Clone {}
+
 #[automock]
 pub trait UserDatabase: Send + Sync {
     async fn create_user(&self, user: User) -> UserDatabaseResult<()>;
