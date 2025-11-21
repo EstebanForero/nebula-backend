@@ -6,7 +6,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    domain::room::{MemberRole, RoomMember, RoomVisibility},
+    domain::room::{MemberRole, Room, RoomMember, RoomVisibility},
     use_cases::room_database::RoomDatabase,
 };
 
@@ -86,6 +86,27 @@ pub async fn join_room(db: Arc<impl RoomDatabase>, room_id: Uuid, user_id: Uuid)
         .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
 
     Ok(())
+}
+
+pub async fn get_user_rooms_use(
+    db: Arc<impl RoomDatabase>,
+    user_id: Uuid,
+) -> RoomResult<Vec<Room>> {
+    let rooms = db
+        .get_user_rooms(user_id)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    Ok(rooms)
+}
+
+pub async fn get_all_public_rooms(db: Arc<impl RoomDatabase>) -> RoomResult<Vec<Room>> {
+    let rooms = db
+        .get_public_rooms()
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    Ok(rooms)
 }
 
 #[derive(Error, Debug)]

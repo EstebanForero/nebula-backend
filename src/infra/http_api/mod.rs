@@ -15,10 +15,16 @@ use crate::{
     domain::room::Message,
     infra::{
         database::PostgresDatabase,
-        http_api::user_endpoints::{login_end, register_end},
+        http_api::{
+            room_endpoints::{
+                create_room_end, get_all_public_rooms_end, get_user_rooms_end, join_room_end,
+            },
+            user_endpoints::{login_end, register_end},
+        },
         redis::RedisPublisher,
         web_socket::ws_handler,
     },
+    use_cases::room_service::{create_room, get_user_rooms_use},
 };
 
 #[derive(Clone)]
@@ -46,6 +52,10 @@ pub async fn start_http_api(
     let app = Router::new()
         .route("/health/auth", get(auth_health_check))
         .route("/ws/room/{room_id}", get(ws_handler))
+        .route("/rooms", get(get_all_public_rooms_end))
+        .route("/rooms/{room_id}", get(get_user_rooms_end))
+        .route("/room", post(create_room_end))
+        .route("/room", post(join_room_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,

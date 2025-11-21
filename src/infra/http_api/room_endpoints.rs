@@ -1,3 +1,72 @@
-use axum::response::IntoResponse;
+use axum::{
+    Extension,
+    extract::{Json, Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-pub async fn user_is_in_room_end() -> impl IntoResponse {}
+use crate::{
+    domain::room::RoomVisibility,
+    infra::http_api::AppState,
+    use_cases::room_service::{
+        create_room, get_all_public_rooms, get_user_rooms_use, join_room, user_is_in_room,
+    },
+};
+
+#[derive(Deserialize, Serialize)]
+pub struct RoomInfo {
+    password: Option<String>,
+    name: String,
+    visibility: RoomVisibility,
+}
+
+pub async fn create_room_end(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<Uuid>,
+    Json(room_info): Json<RoomInfo>,
+) -> impl IntoResponse {
+    match create_room(
+        state.db,
+        room_info.visibility,
+        room_info.password,
+        room_info.name,
+        user_id,
+    )
+    .await
+    {
+        Ok(_) => (StatusCode::OK, "".to_string()),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+pub async fn join_room_end(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<Uuid>,
+    Path(room_id): Path<Uuid>,
+) -> impl IntoResponse {
+    match join_room(state.db, room_id, user_id).await {
+        Ok(_) => (StatusCode::OK, "".to_string()),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+pub async fn get_user_rooms_end(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<Uuid>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    match get_user_rooms_use(state.db, user_id).await {
+        Ok(rooms) => Ok((StatusCode::OK, Json(rooms))),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+    }
+}
+
+pub async fn get_all_public_rooms_end(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    match get_all_public_rooms(state.db).await {
+        Ok(rooms) => Ok((StatusCode::OK, Json(rooms))),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+    }
+}
