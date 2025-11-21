@@ -6,22 +6,32 @@ use axum::{
     Extension, Router, middleware,
     routing::{get, post},
 };
+use dashmap::DashMap;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::infra::{
-    database::PostgresDatabase,
-    http_api::user_endpoints::{login_end, register_end},
-    web_socket::ws_handler,
+use crate::{
+    domain::room::Message,
+    infra::{
+        database::PostgresDatabase,
+        http_api::user_endpoints::{login_end, register_end},
+        web_socket::ws_handler,
+    },
 };
 
 #[derive(Clone)]
 pub struct AppState {
     db: Arc<PostgresDatabase>,
     jwt_secret: String,
+    rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
 }
 
 pub async fn start_http_api(addr: String, jwt_secret: String, db: Arc<PostgresDatabase>) {
-    let auth_state = AppState { db, jwt_secret };
+    let auth_state = AppState {
+        db,
+        jwt_secret,
+        rooms_channels: Arc::new(DashMap::new()),
+    };
 
     let app = Router::new()
         .route("/health/auth", get(auth_health_check))
