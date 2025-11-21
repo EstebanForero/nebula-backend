@@ -46,4 +46,11 @@ impl UserDatabase for PostgresDatabase {
             .await
             .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
     }
+
+    async fn get_user_by_email(&self, email: String) -> UserDatabaseResult<User> {
+        sqlx::query_as!(User, "SELECT * FROM users WHERE email = $1", email)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+    }
 }
