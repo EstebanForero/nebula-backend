@@ -16,7 +16,8 @@ impl RabbitMQ {
 
         connection
             .register_callback(DefaultConnectionCallback)
-            .await.unwrap()
+            .await
+            .unwrap();
 
         // let channel = connection.open_channel(None).await?;
         // channel.register_callback(DefaultChannelCallback).await?;
