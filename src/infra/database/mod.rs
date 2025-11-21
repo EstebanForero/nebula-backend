@@ -1,9 +1,18 @@
 use anyhow::{Context, Result};
-use sqlx::{PgPool, migrate::Migrator, postgres::PgPoolOptions};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, PgPool, migrate::Migrator, postgres::PgPoolOptions};
+use uuid::Uuid;
 
 use crate::{
-    domain::user::User,
-    use_cases::user_database::{UserDatabase, UserDatabaseError, UserDatabaseResult},
+    domain::{
+        room::{Message, Room, RoomMember, RoomVisibility},
+        user::User,
+    },
+    use_cases::{
+        room_database::{RoomDatabase, RoomDatabaseError, RoomDatabaseResult},
+        user_database::{UserDatabase, UserDatabaseError, UserDatabaseResult},
+    },
 };
 
 #[derive(Clone)]
@@ -52,5 +61,153 @@ impl UserDatabase for PostgresDatabase {
             .fetch_one(&self.pool)
             .await
             .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+    }
+
+    async fn get_user_by_id(&self, id: Uuid) -> UserDatabaseResult<User> {
+        sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct DbRoom {
+    pub id: Uuid,
+    pub name: String,
+    pub visibility: Option<String>,
+    pub password_hash: Option<String>,
+    pub created_by: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
+impl TryInto<Room> for DbRoom {
+    type Error = RoomDatabaseError;
+
+    fn try_into(self) -> std::result::Result<Room, Self::Error> {
+        let visibility = match self.visibility {
+            Some(visibility_string) => match visibility_string.as_str() {
+                "public" => Ok(RoomVisibility::Public),
+                "private" => Ok(RoomVisibility::Private),
+                _ => Err(RoomDatabaseError::InternalDBError(format!(
+                    "{visibility_string}: is not public nor private, error deserializing in the db"
+                ))),
+            },
+            None => Err(RoomDatabaseError::InternalDBError(format!(
+                "visibility doesn't contain any string, database error"
+            ))),
+        }?;
+
+        Ok(Room {
+            id: self.id,
+            name: self.name,
+            visibility,
+            password_hash: self.password_hash,
+            created_by: self.created_by,
+            created_at: self.created_at,
+        })
+    }
+}
+
+fn rooms_db_to_rooms(rooms_db: Vec<DbRoom>) -> RoomDatabaseResult<Vec<Room>> {
+    let mut rooms = Vec::new();
+
+    for room_db in rooms_db {
+        let room = room_db.try_into()?;
+        rooms.push(room);
+    }
+
+    Ok(rooms)
+}
+
+impl RoomDatabase for PostgresDatabase {
+    async fn get_user_rooms(&self, user_id: Uuid) -> RoomDatabaseResult<Vec<Room>> {
+        let rooms_db = sqlx::query_as!(
+            DbRoom,
+            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE id = (SELECT room_id FROM room_members WHERE user_id = $1) ORDER BY created_at DESC",
+            user_id
+        ).fetch_all(&self.pool).await
+            .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        rooms_db_to_rooms(rooms_db)
+    }
+
+    async fn get_public_rooms(&self) -> RoomDatabaseResult<Vec<Room>> {
+        let rooms_db = sqlx::query_as!(
+            DbRoom,
+            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE visibility = 'public'::room_visibility ORDER BY created_at DESC"
+        ).fetch_all(&self.pool).await
+            .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        rooms_db_to_rooms(rooms_db)
+    }
+
+    async fn get_room(&self, id: Uuid) -> RoomDatabaseResult<Room> {
+        let room_db = sqlx::query_as!(
+            DbRoom,
+            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE id = $1",
+            id
+        ).fetch_one(&self.pool).await
+            .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        room_db.try_into()
+    }
+
+    async fn create_room(&self, room: Room) -> RoomDatabaseResult<()> {
+        todo!()
+    }
+
+    async fn create_room_membership(&self, room_member: RoomMember) -> RoomDatabaseResult<()> {
+        sqlx::query!(
+            "INSERT INTO room_members (room_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
+            room_member.room_id,
+            room_member.user_id,
+            room_member.role,
+            room_member.joined_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn delete_room_membership(&self, room_id: Uuid, user_id: Uuid) -> RoomDatabaseResult<()> {
+        sqlx::query!(
+            "DELETE FROM room_members WHERE room_id = $1 AND user_id = $2",
+            room_id,
+            user_id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_room_members(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<User>> {
+        let users = sqlx::query_as!(
+            User,
+            "SELECT * FROM users WHERE id = (SELECT user_id FROM room_members WHERE room_id = $1)",
+            room_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(users)
+    }
+
+    async fn get_room_messages(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<Message>> {
+        let messages = sqlx::query_as!(
+            Message,
+            "SELECT * FROM messages WHERE room_id = $1",
+            room_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(messages)
     }
 }
