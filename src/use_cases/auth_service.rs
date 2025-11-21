@@ -12,9 +12,9 @@ use crate::{domain::user::User, use_cases::user_database::UserDatabase};
 type AuthResult<T> = Result<T, AuthError>;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    exp: usize,
-    sub: String,
+pub struct Claims {
+    pub exp: usize,
+    pub sub: String,
 }
 
 pub async fn login(
