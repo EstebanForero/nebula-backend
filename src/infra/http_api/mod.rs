@@ -15,6 +15,7 @@ use crate::{
     infra::{
         database::PostgresDatabase,
         http_api::user_endpoints::{login_end, register_end},
+        redis::RedisPublisher,
         web_socket::ws_handler,
     },
 };
@@ -24,6 +25,7 @@ pub struct AppState {
     pub db: Arc<PostgresDatabase>,
     jwt_secret: String,
     pub rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
+    redis_publisher: Arc<RedisPublisher>,
 }
 
 pub async fn start_http_api(
@@ -31,11 +33,13 @@ pub async fn start_http_api(
     jwt_secret: String,
     db: Arc<PostgresDatabase>,
     rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
+    redis_publisher: Arc<RedisPublisher>,
 ) {
     let auth_state = AppState {
         db,
         jwt_secret,
         rooms_channels,
+        redis_publisher,
     };
 
     let app = Router::new()

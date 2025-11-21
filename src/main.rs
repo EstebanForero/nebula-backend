@@ -34,7 +34,7 @@ async fn main() {
 
     let postgres_database = Arc::new(PostgresDatabase::new(&env_vars.database_url).await.unwrap());
 
-    let message_publisher = Arc::new(RedisPublisher::new(&env_vars.redis_url));
+    let message_publisher = Arc::new(RedisPublisher::new(&env_vars.redis_url).await);
 
     let message_consumer = RedisConsumer::new(
         &env_vars.redis_url,
@@ -58,6 +58,7 @@ async fn main() {
         env_vars.jwt_secret,
         postgres_database,
         rooms_channels.clone(),
+        message_publisher,
     )
     .await;
 }
