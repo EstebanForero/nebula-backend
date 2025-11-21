@@ -1,23 +1,40 @@
 use axum::{
     Extension,
     extract::{Path, State, WebSocketUpgrade},
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use tokio::sync::broadcast;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::infra::http_api::AppState;
+use crate::{infra::http_api::AppState, use_cases::room_service::user_is_in_room};
 
 pub async fn ws_handler(
     Path(room_id): Path<Uuid>,
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
-) -> impl IntoResponse {
+) -> Response {
     info!("User with id: {user_id} joining room: {}", room_id);
 
-    // Use method user is in room
+    let is_in_room = match user_is_in_room(state.db.clone(), user_id, room_id).await {
+        Ok(res) => res,
+        Err(_) => {
+            error!("Error verifying room, check the room id");
+            return Response::builder()
+                .status(400)
+                .body("Invalid room".into())
+                .unwrap();
+        }
+    };
+
+    if !is_in_room {
+        return Response::builder()
+            .status(403)
+            .body("Not eough access to enter the room".into())
+            .unwrap();
+    }
 
     ws.on_upgrade(move |socket| handle_socket(socket, room_id, user_id, state))
 }
@@ -40,6 +57,10 @@ async fn handle_socket(
     let mut sender = socket;
 
     while let Ok(msg) = receiver.recv().await {
+        if msg.sender_id == user_id {
+            continue;
+        }
+
         let msg_json = if let Ok(msg_json) = serde_json::to_string(&msg) {
             msg_json
         } else {

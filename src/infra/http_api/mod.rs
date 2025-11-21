@@ -21,7 +21,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
-    db: Arc<PostgresDatabase>,
+    pub db: Arc<PostgresDatabase>,
     jwt_secret: String,
     pub rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
 }
