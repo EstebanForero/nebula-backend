@@ -34,6 +34,8 @@ pub trait RoomDatabase: Send + Sync {
 
     /// Get's all of the messages for n specific room
     async fn get_room_messages(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<Message>>;
+
+    async fn create_message(&self, message: Message) -> RoomDatabaseResult<()>;
 }
 
 #[derive(Debug, Error)]

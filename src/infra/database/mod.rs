@@ -210,4 +210,19 @@ impl RoomDatabase for PostgresDatabase {
 
         Ok(messages)
     }
+
+    async fn create_message(&self, message: Message) -> RoomDatabaseResult<()> {
+        sqlx::query!(
+            "INSERT INTO messages (id, room_id, sender_id, content) VALUES ($1, $2, $3, $4)",
+            message.id,
+            message.room_id,
+            message.sender_id,
+            message.content
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(())
+    }
 }
