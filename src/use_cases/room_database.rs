@@ -23,7 +23,7 @@ pub trait RoomDatabase: Send + Sync {
     /// Creates a room
     async fn create_room(&self, room: Room) -> RoomDatabaseResult<()>;
 
-    /// Joins a specific user from a specific room
+    /// Joins a specific user to a specific room
     async fn create_room_membership(&self, room_member: RoomMember) -> RoomDatabaseResult<()>;
 
     /// Removes a specific user from a specific room

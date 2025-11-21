@@ -11,7 +11,7 @@ use crate::{
         http_api::start_http_api,
         redis::{RedisConsumer, RedisPublisher},
     },
-    use_cases::user_database::UserDatabase,
+    use_cases::{realtime_service::realtime_messsage_broker, user_database::UserDatabase},
 };
 
 mod domain;
@@ -25,7 +25,7 @@ struct EnvVariables {
     redis_url: String,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tracing_subscriber::fmt::init();
     let _ = dotenv();
@@ -49,5 +49,5 @@ async fn main() {
 
     start_http_api(addr, env_vars.jwt_secret, postgres_database, rooms_channels).await;
 
-    start
+    realtime_messsage_broker(message_consumer, rooms_channels)
 }
