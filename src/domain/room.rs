@@ -27,7 +27,7 @@ pub struct Room {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
-enum MemberRole {
+pub enum MemberRole {
     Creator,
     Member,
 }
