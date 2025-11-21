@@ -32,9 +32,11 @@ pub trait RoomDatabase: Send + Sync {
     /// Get's all of the members for n specific room
     async fn get_room_members(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<User>>;
 
-    /// Get's all of the messages for n specific room
+    /// Get's all of the messages for n specific room, in DESC order, we get first the latest
+    /// messages, and last, the new messages
     async fn get_room_messages(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<Message>>;
 
+    /// This functions get
     async fn create_message(&self, message: Message) -> RoomDatabaseResult<()>;
 }
 
