@@ -1,5 +1,6 @@
 use mockall::automock;
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::domain::user::User;
 
@@ -12,6 +13,8 @@ pub trait UserDatabase: Send + Sync {
     async fn get_user_by_username(&self, username: String) -> UserDatabaseResult<User>;
 
     async fn get_user_by_email(&self, email: String) -> UserDatabaseResult<User>;
+
+    async fn get_user_by_id(&self, id: Uuid) -> UserDatabaseResult<User>;
 }
 
 #[derive(Debug, Error)]
