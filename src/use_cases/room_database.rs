@@ -1,15 +1,16 @@
+use mockall::automock;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::{
-    dto::MessageView,
     room::{Message, Room, RoomMember},
     user::User,
 };
 
 pub type RoomDatabaseResult<T> = Result<T, RoomDatabaseError>;
 
-pub trait RoomDatabase: Clone + Send + Sync {
+#[automock]
+pub trait RoomDatabase: Send + Sync {
     /// This method returns all the public rooms
     async fn get_public_rooms(&self) -> RoomDatabaseResult<Vec<Room>>;
 
