@@ -39,7 +39,8 @@ async fn main() {
     let message_consumer = RedisConsumer::new(
         &env_vars.redis_url,
         infra::redis::RedisChannel::ChatMessages,
-    );
+    )
+    .await;
 
     let rooms_channels = Arc::new(DashMap::new());
 
@@ -47,7 +48,16 @@ async fn main() {
 
     info!("the addr is: {}", addr);
 
-    start_http_api(addr, env_vars.jwt_secret, postgres_database, rooms_channels).await;
+    let rooms_channels1 = rooms_channels.clone();
+    tokio::spawn(async move {
+        realtime_messsage_broker(message_consumer, rooms_channels1).await;
+    });
 
-    realtime_messsage_broker(message_consumer, rooms_channels).await;
+    start_http_api(
+        addr,
+        env_vars.jwt_secret,
+        postgres_database,
+        rooms_channels.clone(),
+    )
+    .await;
 }
