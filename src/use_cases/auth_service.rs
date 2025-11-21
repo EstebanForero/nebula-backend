@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bcrypt::{DEFAULT_COST, hash, verify};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -36,7 +36,7 @@ pub async fn login(
 
     if succesful {
         let my_claims = Claims {
-            exp: Utc::now().timestamp() as usize,
+            exp: (Utc::now() + Duration::hours(3)).timestamp() as usize,
             sub: format!("{}", user.id),
         };
 
