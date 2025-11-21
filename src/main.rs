@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use dotenvy::dotenv;
 use serde::Deserialize;
+use tracing::info;
 
 use crate::{
     infra::{
@@ -25,6 +26,7 @@ struct EnvVariables {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
     let _ = dotenv();
 
     let env_vars = envy::from_env::<EnvVariables>().unwrap();
@@ -38,5 +40,9 @@ async fn main() {
         infra::redis::RedisChannel::ChatMessages,
     ));
 
-    start_http_api();
+    let addr = "0.0.0.0:3838".to_string();
+
+    info!("the addr is: {}", addr);
+
+    start_http_api(addr, env_vars.jwt_secret, postgres_database).await;
 }
