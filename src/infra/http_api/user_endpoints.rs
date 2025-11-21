@@ -6,7 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    infra::http_api::AuthState,
+    infra::http_api::AppState,
     use_cases::auth_service::{login, register},
 };
 
@@ -24,7 +24,7 @@ pub struct RegisterInfo {
 }
 
 pub async fn login_end(
-    State(state): State<AuthState>,
+    State(state): State<AppState>,
     Json(auth_info): Json<AuthInfo>,
 ) -> impl IntoResponse {
     match login(
@@ -41,7 +41,7 @@ pub async fn login_end(
 }
 
 pub async fn register_end(
-    State(state): State<AuthState>,
+    State(state): State<AppState>,
     Json(register_info): Json<RegisterInfo>,
 ) -> impl IntoResponse {
     match register(
