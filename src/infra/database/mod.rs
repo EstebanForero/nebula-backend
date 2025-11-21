@@ -93,9 +93,9 @@ impl TryInto<Room> for DbRoom {
                     "{visibility_string}: is not public nor private, error deserializing in the db"
                 ))),
             },
-            None => Err(RoomDatabaseError::InternalDBError(format!(
-                "visibility doesn't contain any string, database error"
-            ))),
+            None => Err(RoomDatabaseError::InternalDBError(
+                "visibility doesn't contain any string, database error".to_string(),
+            )),
         }?;
 
         Ok(Room {
@@ -154,7 +154,20 @@ impl RoomDatabase for PostgresDatabase {
     }
 
     async fn create_room(&self, room: Room) -> RoomDatabaseResult<()> {
-        todo!()
+        sqlx::query!(
+            "INSERT INTO rooms (id, name, visibility, password_hash, created_by, created_at) VALUES ($1, $2, $3::room_visibility, $4, $5, $6)",
+            room.id,
+            room.name,
+            room.visibility.to_string(),
+            room.password_hash,
+            room.created_by,
+            room.created_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
+
+        Ok(())
     }
 
     async fn create_room_membership(&self, room_member: RoomMember) -> RoomDatabaseResult<()> {

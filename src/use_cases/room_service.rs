@@ -62,7 +62,7 @@ pub async fn create_room(
     let room_membre = RoomMember {
         room_id,
         user_id,
-        role: MemberRole::Creator,
+        role: MemberRole::Owner,
         joined_at: Utc::now(),
     };
 

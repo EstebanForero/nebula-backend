@@ -1,7 +1,3 @@
--- Add migration script here
-
-CREATE TYPE room_visibility AS ENUM ('public', 'private');
-
 CREATE TABLE users (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username        TEXT NOT NULL UNIQUE,
@@ -14,19 +10,27 @@ CREATE TABLE users (
 CREATE TABLE rooms (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            TEXT NOT NULL,
-    visibility      room_visibility NOT NULL DEFAULT 'public',
+    visibility      TEXT NOT NULL DEFAULT 'public',
     password_hash   TEXT NULL,                     -- only for private rooms if using password
     created_by      UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- Optional: enforce only these values
+    CONSTRAINT chk_room_visibility
+        CHECK (visibility IN ('public', 'private'))
 );
 
 CREATE TABLE room_members (
     room_id     UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role        TEXT NOT NULL DEFAULT 'member',   -- e.g. 'owner' | 'member'
+    role        TEXT NOT NULL DEFAULT 'member',
     joined_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (room_id, user_id)
+    PRIMARY KEY (room_id, user_id),
+
+    
+    CONSTRAINT chk_room_member_role
+        CHECK (role IN ('owner', 'member'))
 );
 
 CREATE TABLE messages (
@@ -37,15 +41,13 @@ CREATE TABLE messages (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Idexes
+-- Indexes
 
 CREATE INDEX idx_messages_room_created_at
     ON messages (room_id, created_at DESC);
 
 CREATE INDEX idx_messages_room_id
     ON messages (room_id);
-
-
 
 CREATE TABLE room_read_state (
     room_id              UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -55,5 +57,4 @@ CREATE TABLE room_read_state (
 
     PRIMARY KEY (room_id, user_id)
 );
-
 

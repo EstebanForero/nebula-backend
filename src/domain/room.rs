@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, prelude::Type};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -10,6 +10,15 @@ use uuid::Uuid;
 pub enum RoomVisibility {
     Public,
     Private,
+}
+
+impl Display for RoomVisibility {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RoomVisibility::Public => write!(f, "public"),
+            RoomVisibility::Private => write!(f, "private"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -30,14 +39,14 @@ pub struct Room {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum MemberRole {
-    Creator,
+    Owner,
     Member,
 }
 
 impl Display for MemberRole {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MemberRole::Creator => write!(f, "creator"),
+            MemberRole::Owner => write!(f, "owner"),
             MemberRole::Member => write!(f, "member"),
         }
     }
