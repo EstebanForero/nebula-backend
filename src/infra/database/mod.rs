@@ -135,7 +135,7 @@ impl RoomDatabase for PostgresDatabase {
     async fn get_public_rooms(&self) -> RoomDatabaseResult<Vec<Room>> {
         let rooms_db = sqlx::query_as!(
             DbRoom,
-            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE visibility = 'public'::room_visibility ORDER BY created_at DESC"
+            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE visibility = 'public' ORDER BY created_at DESC"
         ).fetch_all(&self.pool).await
             .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
 
@@ -155,7 +155,7 @@ impl RoomDatabase for PostgresDatabase {
 
     async fn create_room(&self, room: Room) -> RoomDatabaseResult<()> {
         sqlx::query!(
-            "INSERT INTO rooms (id, name, visibility, password_hash, created_by, created_at) VALUES ($1, $2, $3::room_visibility, $4, $5, $6)",
+            "INSERT INTO rooms (id, name, visibility, password_hash, created_by, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
             room.id,
             room.name,
             room.visibility.to_string(),
