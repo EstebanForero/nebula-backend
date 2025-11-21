@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -32,13 +34,12 @@ pub enum MemberRole {
     Member,
 }
 
-impl ToString for MemberRole {
-    fn to_string(&self) -> String {
+impl Display for MemberRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MemberRole::Creator => "creator",
-            MemberRole::Member => "member",
+            MemberRole::Creator => write!(f, "creator"),
+            MemberRole::Member => write!(f, "member"),
         }
-        .to_string()
     }
 }
 
