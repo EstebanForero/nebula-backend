@@ -16,10 +16,10 @@ impl RabbitMQ {
 
         connection
             .register_callback(DefaultConnectionCallback)
-            .await?;
+            .await.unwrap()
 
-        let channel = connection.open_channel(None).await?;
-        channel.register_callback(DefaultChannelCallback).await?;
+        // let channel = connection.open_channel(None).await?;
+        // channel.register_callback(DefaultChannelCallback).await?;
 
         // channel.confirm_select(args)
 
