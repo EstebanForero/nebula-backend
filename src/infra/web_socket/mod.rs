@@ -12,7 +12,6 @@ pub async fn ws_handler(
 ) -> impl IntoResponse {
     println!("User joining room: {}", room_id);
 
-    // 3. Upgrade to WebSocket
     ws.on_upgrade(move |socket| handle_socket(socket, room_id, state))
 }
 
