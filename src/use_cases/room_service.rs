@@ -1,9 +1,14 @@
 use std::sync::Arc;
 
+use bcrypt::{DEFAULT_COST, hash};
+use chrono::Utc;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::use_cases::room_database::RoomDatabase;
+use crate::{
+    domain::room::{MemberRole, RoomMember, RoomVisibility},
+    use_cases::room_database::RoomDatabase,
+};
 
 type RoomResult<T> = Result<T, RoomError>;
 
@@ -20,8 +25,75 @@ pub async fn user_is_in_room(
     Ok(rooms.iter().any(|room| room.id == room_id))
 }
 
+pub async fn create_room(
+    db: Arc<impl RoomDatabase>,
+    visibility: RoomVisibility,
+    password: Option<String>,
+    name: String,
+    user_id: Uuid,
+) -> RoomResult<()> {
+    let room_id = Uuid::new_v4();
+    let mut hashed_pasword: Option<String> = None;
+
+    if let RoomVisibility::Private = visibility
+        && password.is_some()
+    {
+        let hash = hash(password.unwrap(), DEFAULT_COST)
+            .map_err(|err| RoomError::PasswordHashError(err.to_string()))?;
+        hashed_pasword = Some(hash)
+    } else if let RoomVisibility::Private = visibility
+        && password.is_none()
+    {
+        return Err(RoomError::PasswordNotGiven);
+    };
+
+    let room = crate::domain::room::Room {
+        id: room_id,
+        name,
+        visibility,
+        password_hash: hashed_pasword,
+        created_by: user_id,
+        created_at: Utc::now(),
+    };
+    db.create_room(room)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    let room_membre = RoomMember {
+        room_id,
+        user_id,
+        role: MemberRole::Creator,
+        joined_at: Utc::now(),
+    };
+
+    db.create_room_membership(room_membre)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    Ok(())
+}
+
+pub async fn join_room(db: Arc<impl RoomDatabase>, room_id: Uuid, user_id: Uuid) -> RoomResult<()> {
+    let room_member = RoomMember {
+        room_id,
+        user_id,
+        role: MemberRole::Member,
+        joined_at: Utc::now(),
+    };
+
+    db.create_room_membership(room_member)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    Ok(())
+}
+
 #[derive(Error, Debug)]
 pub enum RoomError {
     #[error("database Error")]
     DatabaseError(String),
+    #[error("hashing error")]
+    PasswordHashError(String),
+    #[error("pasword not given")]
+    PasswordNotGiven,
 }
