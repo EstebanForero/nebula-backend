@@ -36,10 +36,10 @@ async fn main() {
 
     let message_publisher = Arc::new(RedisPublisher::new(&env_vars.redis_url));
 
-    let message_consumer = Arc::new(RedisConsumer::new(
+    let message_consumer = RedisConsumer::new(
         &env_vars.redis_url,
         infra::redis::RedisChannel::ChatMessages,
-    ));
+    );
 
     let rooms_channels = Arc::new(DashMap::new());
 
@@ -48,4 +48,6 @@ async fn main() {
     info!("the addr is: {}", addr);
 
     start_http_api(addr, env_vars.jwt_secret, postgres_database, rooms_channels).await;
+
+    start
 }
