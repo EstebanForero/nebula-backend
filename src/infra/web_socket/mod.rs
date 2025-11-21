@@ -1,37 +1,17 @@
-use axum::{http, response::IntoResponse};
-use tokio::net::TcpListener;
-use tokio_tungstenite::tungstenite::{
-    self,
-    handshake::server::{ErrorResponse, Request, Response},
+use axum::{
+    extract::{Path, State, WebSocketUpgrade},
+    response::IntoResponse,
 };
-use tracing::info;
 
-async fn start_web_socket_api(addr: &str) {
-    let listener = TcpListener::bind(addr)
-        .await
-        .expect("Error binding WS TCP listener");
+use crate::infra::http_api::AppState;
 
-    info!("Listening on: {}", addr);
+pub async fn ws_handler(
+    Path(room_id): Path<String>,
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    println!("User joining room: {}", room_id);
 
-    while let Ok((stream, addr)) = listener.accept().await {
-        // Validate the headers in the stream
-
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, |req: &Request, response| {
-            let auth = req
-                .headers()
-                .get("authorization")
-                .and_then(|h| h.to_str().ok())
-                .and_then(|h| h.strip_prefix("Bearer "));
-
-            if let Some(token) = auth {
-                Ok(response)
-            } else {
-                let res = Err(http::Response::new(Some(
-                    "Invalid or missing token".to_string(),
-                )));
-
-                res
-            }
-        });
-    }
+    // 3. Upgrade to WebSocket
+    ws.on_upgrade(move |socket| handle_socket(socket, room_id, state))
 }
