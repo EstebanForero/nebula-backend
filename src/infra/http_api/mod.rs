@@ -1,4 +1,5 @@
 mod middleware_auth;
+pub mod room_endpoints;
 pub mod user_endpoints;
 use std::sync::Arc;
 
