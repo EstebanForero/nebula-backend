@@ -66,7 +66,10 @@ impl RedisConsumer {
             .expect("Error creating pubsub async for redis");
 
         match redis_channel {
-            RedisChannel::ChatMessages => pubsub.subscribe("chat:messages"),
+            RedisChannel::ChatMessages => pubsub
+                .subscribe("chat:messages")
+                .await
+                .expect("Error subscribing to redis"),
         };
 
         let msgs: PubSubStream = pubsub.into_on_message();

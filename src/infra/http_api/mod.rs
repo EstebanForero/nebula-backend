@@ -23,14 +23,19 @@ use crate::{
 pub struct AppState {
     db: Arc<PostgresDatabase>,
     jwt_secret: String,
-    rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
+    pub rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
 }
 
-pub async fn start_http_api(addr: String, jwt_secret: String, db: Arc<PostgresDatabase>) {
+pub async fn start_http_api(
+    addr: String,
+    jwt_secret: String,
+    db: Arc<PostgresDatabase>,
+    rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
+) {
     let auth_state = AppState {
         db,
         jwt_secret,
-        rooms_channels: Arc::new(DashMap::new()),
+        rooms_channels,
     };
 
     let app = Router::new()

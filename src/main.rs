@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use dashmap::DashMap;
 use dotenvy::dotenv;
 use serde::Deserialize;
 use tracing::info;
@@ -40,9 +41,11 @@ async fn main() {
         infra::redis::RedisChannel::ChatMessages,
     ));
 
+    let rooms_channels = Arc::new(DashMap::new());
+
     let addr = "0.0.0.0:3838".to_string();
 
     info!("the addr is: {}", addr);
 
-    start_http_api(addr, env_vars.jwt_secret, postgres_database).await;
+    start_http_api(addr, env_vars.jwt_secret, postgres_database, rooms_channels).await;
 }
