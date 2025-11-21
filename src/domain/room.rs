@@ -32,6 +32,16 @@ pub enum MemberRole {
     Member,
 }
 
+impl ToString for MemberRole {
+    fn to_string(&self) -> String {
+        match self {
+            MemberRole::Creator => "creator",
+            MemberRole::Member => "member",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct RoomMember {

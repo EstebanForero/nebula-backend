@@ -162,7 +162,7 @@ impl RoomDatabase for PostgresDatabase {
             "INSERT INTO room_members (room_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
             room_member.room_id,
             room_member.user_id,
-            room_member.role,
+            room_member.role.to_string(),
             room_member.joined_at
         )
         .execute(&self.pool)
