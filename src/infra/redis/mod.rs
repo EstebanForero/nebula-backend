@@ -48,7 +48,7 @@ impl MessagePublisher for RedisPublisher {
 
 pub struct RedisConsumer {
     redis_url: String,
-    redis_channel: RedisChannel
+    redis_channel: RedisChannel,
     pubsubstream: PubSubStream,
 }
 
@@ -71,14 +71,14 @@ impl RedisConsumer {
 
         let msgs: PubSubStream = pubsub.into_on_message();
 
-        RedisConsumer { 
+        RedisConsumer {
             redis_url: redis_url.to_string(),
             redis_channel,
-            pubsubstream: msgs 
+            pubsubstream: msgs,
         }
     }
 
-    pub async fn reconect(&mut self) -> RealTimeBrokerResult<()>{
+    pub async fn reconect(&mut self) -> RealTimeBrokerResult<()> {
         todo!()
     }
 }
