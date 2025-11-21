@@ -3,7 +3,10 @@ use std::sync::Arc;
 use dotenvy::dotenv;
 use serde::Deserialize;
 
-use crate::{infra::database::PostgresDatabase, use_cases::user_database::UserDatabase};
+use crate::{
+    infra::{database::PostgresDatabase, http_api::start_http_api},
+    use_cases::user_database::UserDatabase,
+};
 
 mod domain;
 mod infra;
@@ -22,4 +25,6 @@ async fn main() {
     let env_vars = envy::from_env::<EnvVariables>().unwrap();
 
     let postgres_database = Arc::new(PostgresDatabase::new(&env_vars.database_url).await.unwrap());
+
+    start_http_api();
 }
