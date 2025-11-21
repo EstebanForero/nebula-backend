@@ -12,6 +12,7 @@ mod use_cases;
 #[derive(Deserialize, Debug)]
 struct EnvVariables {
     database_url: String,
+    jwt_secret: String,
 }
 
 #[tokio::main]
