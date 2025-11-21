@@ -25,12 +25,19 @@ pub struct Room {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
+enum MemberRole {
+    Creator,
+    Member,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct RoomMember {
     pub room_id: Uuid,
     pub user_id: Uuid,
-    pub role: String, // could also be an enum if you define it
+    pub role: MemberRole,
     pub joined_at: DateTime<Utc>,
 }
 

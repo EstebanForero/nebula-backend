@@ -49,5 +49,5 @@ async fn main() {
 
     start_http_api(addr, env_vars.jwt_secret, postgres_database, rooms_channels).await;
 
-    realtime_messsage_broker(message_consumer, rooms_channels)
+    realtime_messsage_broker(message_consumer, rooms_channels).await;
 }
