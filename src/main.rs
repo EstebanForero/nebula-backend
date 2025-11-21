@@ -20,5 +20,5 @@ async fn main() {
 
     let env_vars = envy::from_env::<EnvVariables>().unwrap();
 
-    let user_database = PostgresDatabase::new(&env_vars.database_url).await.unwrap();
+    let postgres_database = Arc::new(PostgresDatabase::new(&env_vars.database_url).await.unwrap());
 }
