@@ -1,4 +1,4 @@
-use axum::http;
+use axum::{http, response::IntoResponse};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::{
     self,
@@ -26,11 +26,11 @@ async fn start_web_socket_api(addr: &str) {
             if let Some(token) = auth {
                 Ok(response)
             } else {
-                // response = Response::builder()
-                //     .status(401)
-                //     .body("Invalid or missing bearer token")
-                //     .unwrap();
-                todo!()
+                let res = Err(http::Response::new(Some(
+                    "Invalid or missing token".to_string(),
+                )));
+
+                res
             }
         });
     }
