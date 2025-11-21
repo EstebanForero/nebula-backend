@@ -15,3 +15,7 @@ pub async fn ws_handler(
     // 3. Upgrade to WebSocket
     ws.on_upgrade(move |socket| handle_socket(socket, room_id, state))
 }
+
+async fn handle_socket(mut socket: axum::extract::ws::WebSocket, room_id: String, state: AppState) {
+    todo!()
+}
