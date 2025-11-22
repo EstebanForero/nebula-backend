@@ -6,7 +6,10 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    domain::room::{MemberRole, Message, Room, RoomMember, RoomVisibility},
+    domain::{
+        room::{MemberRole, Message, Room, RoomMember, RoomVisibility},
+        user::User,
+    },
     use_cases::{
         notification_processing::MessageProcessing, realtime_broker::MessagePublisher,
         room_database::RoomDatabase,
@@ -159,9 +162,28 @@ pub async fn obtain_messages(
     Ok(messages)
 }
 
+pub async fn obtain_room_members(
+    db: Arc<impl RoomDatabase>,
+    room_id: Uuid,
+) -> RoomResult<Vec<User>> {
+    let users = db
+        .get_room_members(room_id)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+    Ok(users)
+}
+//
+//
+//
+//
+//
+//
+//
+//
+
 #[derive(Error, Debug)]
 pub enum RoomError {
-    #[error("database Error")]
+    #[error("database Error {0}")]
     DatabaseError(String),
     #[error("hashing error")]
     PasswordHashError(String),
