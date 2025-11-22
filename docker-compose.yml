@@ -58,7 +58,7 @@ services:
 
   backend:
     build: .
-    image: nebula-backend:latest        # local image name for reuse if you want
+    image: nebula-backend:latest
     container_name: nebula-backend
     restart: unless-stopped
     depends_on:
@@ -66,15 +66,34 @@ services:
       - redis
       - rabbitmq
     env_file:
-      - .env                            # your existing backend envs
+      - .env
     environment:
-      # Override connection URLs to use internal Docker hostnames
+      # Bind backend inside the container
+      BACKEND_ADDR: 0.0.0.0:3838
+
+      DEV_MODE: "true"
+
+      # Override DB / Redis to use Docker service hosts
       DATABASE_URL: postgres://nebula:nebula123@postgres:5432/nebula
       REDIS_URL: redis://redis:6379
-      RABBIT_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
-      # If you have JWT_SECRET / other secrets in .env they’ll still be loaded
+
+      # Rabbit connection details using internal hostnames
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: nebula
+      RABBITMQ_PASSWORD: nebula123
+      RABBITMQ_VHOST: nebula
+
+      # Optional AMQP_URL if your app uses it
+      AMQP_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
+
+      # Host-specific hints if your code uses these
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
     ports:
-      - "3838:3838"                     # Backend HTTP API → http://localhost:3838
+      - "3838:3838"                 # Backend HTTP API → http://localhost:3838
 
   notification-service:
     image: esteban1930/nebula-notification-service:latest
@@ -86,15 +105,23 @@ services:
     env_file:
       - .env
     environment:
-      # Override core infra URLs to point to Docker services
+      # Override infra URLs to use Docker service names, keep the same variable names
       DATABASE_URL: postgres://nebula:nebula123@postgres:5432/nebula
       RABBIT_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
-      # JWT_SECRET and VAPID keys can come from .env
-      JWT_SECRET: ${JWT_SECRET:-changeme}
-      WEBPUSH_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY:-changeme}
-      WEBPUSH_VAPID_PRIVATE_KEY: ${WEBPUSH_VAPID_PRIVATE_KEY:-changeme}
+
+      # Queue name stays as in your .env
+      RABBIT_QUEUE: room_member.notifications
+
+      # HTTP port inside the container
+      HTTP_PORT: 3010
+
+      # Dev flag
+      DEV_MODE: "true"
+
+      # The WEBPUSH_* and JWT_SECRET, RESEND_API_KEY, FROM_EMAIL come from .env
+      # and are not overridden here on purpose so they stay exactly as you defined them.
     ports:
-      - "3010:3010"                     # Notification HTTP API → http://localhost:3010
+      - "3010:3010"                 # Notification HTTP API → http://localhost:3010
 
   frontend:
     image: esteban1930/nebula-frontend:latest
@@ -104,20 +131,19 @@ services:
       - backend
       - notification-service
     ports:
-      - "8080:80"                       # Frontend → http://localhost:8080
+      - "8080:80"                   # Frontend → http://localhost:8080
     environment:
-      # These are used by Vite at build/runtime in the container
-      # From the BROWSER’s POV, it talks to localhost:3838 / 3010
+      # From the BROWSER pov, backend & notifications are on localhost
       VITE_API_BASE_URL: http://localhost:3838
       VITE_NOTIFICATION_BASE_URL: http://localhost:3010
-      VITE_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY:-changeme}
+      VITE_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY}
 
   prometheus:
     image: prom/prometheus:latest
     container_name: nebula-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"                     # Prometheus UI → http://localhost:9090
+      - "9090:9090"                 # Prometheus UI → http://localhost:9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
@@ -125,8 +151,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=7d"
       - "--web.enable-lifecycle"
-    # if backend is now in this compose, in prometheus.yml change the target to backend:3838
-    # extra_hosts no longer strictly needed, but harmless
+    # now that backend is a service, in prometheus.yml use targets: ["backend:3838"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -135,7 +160,7 @@ services:
     container_name: nebula-grafana
     restart: unless-stopped
     ports:
-      - "3050:3000"                     # Grafana UI → http://localhost:3050
+      - "3050:3000"                 # Grafana UI → http://localhost:3050
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin   # change in real env

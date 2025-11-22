@@ -1,4 +1,6 @@
-FROM rust:1.91-slim AS builder
+# Use bookworm-based Rust image so it matches the runtime
+FROM rust:1.91-bookworm AS builder
+# or: FROM rust:1.91-bookworm-slim AS builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -17,6 +19,7 @@ ENV SQLX_OFFLINE=true
 
 RUN cargo build --release --locked
 
+# Runtime stage: same Debian family (bookworm)
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
@@ -35,8 +38,11 @@ COPY --from=builder /app/migrations ./migrations
 RUN chown -R nebula:nebula /app
 USER nebula
 
-EXPOSE 8000
+# Your app actually listens on 3838 (BACKEND_ADDR=0.0.0.0:3838),
+# so it's nicer to expose that, even though EXPOSE is just metadata.
+EXPOSE 3838
 
 ENV RUST_LOG=info
 
 CMD ["nebula-backend"]
+
