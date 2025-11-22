@@ -18,6 +18,7 @@ use crate::{
         http_api::{
             room_endpoints::{
                 create_room_end, get_all_public_rooms_end, get_user_rooms_end, join_room_end,
+                send_message_end,
             },
             user_endpoints::{login_end, register_end},
         },
@@ -52,10 +53,11 @@ pub async fn start_http_api(
     let app = Router::new()
         .route("/health/auth", get(auth_health_check))
         .route("/ws/room/{room_id}", get(ws_handler))
-        .route("/rooms", get(get_all_public_rooms_end))
-        .route("/rooms/{room_id}", get(get_user_rooms_end))
+        .route("/rooms/public", get(get_all_public_rooms_end))
+        .route("/rooms", get(get_user_rooms_end))
         .route("/room", post(create_room_end))
         .route("/room/join", post(join_room_end))
+        .route("/message", post(send_message_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,

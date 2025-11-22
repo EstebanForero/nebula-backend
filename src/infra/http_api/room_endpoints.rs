@@ -1,6 +1,6 @@
 use axum::{
     Extension,
-    extract::{Json, Path, State},
+    extract::{Json, Path, State, rejection::JsonRejection},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -11,7 +11,8 @@ use crate::{
     domain::room::RoomVisibility,
     infra::http_api::AppState,
     use_cases::room_service::{
-        create_room, get_all_public_rooms, get_user_rooms_use, join_room, user_is_in_room,
+        create_room, get_all_public_rooms, get_user_rooms_use, join_room, send_message,
+        user_is_in_room,
     },
 };
 
@@ -20,6 +21,12 @@ pub struct RoomInfo {
     password: Option<String>,
     name: String,
     visibility: RoomVisibility,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct MessageInfo {
+    room_id: Uuid,
+    content: String,
 }
 
 pub async fn create_room_end(
@@ -68,5 +75,24 @@ pub async fn get_all_public_rooms_end(
     match get_all_public_rooms(state.db).await {
         Ok(rooms) => Ok((StatusCode::OK, Json(rooms))),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+    }
+}
+
+pub async fn send_message_end(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<Uuid>,
+    Json(message_info): Json<MessageInfo>,
+) -> impl IntoResponse {
+    match send_message(
+        state.db,
+        message_info.room_id,
+        user_id,
+        message_info.content,
+        state.redis_publisher,
+    )
+    .await
+    {
+        Ok(_) => (StatusCode::OK, "".to_string()),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }
 }

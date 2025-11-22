@@ -6,8 +6,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    domain::room::{MemberRole, Room, RoomMember, RoomVisibility},
-    use_cases::room_database::RoomDatabase,
+    domain::room::{MemberRole, Message, Room, RoomMember, RoomVisibility},
+    use_cases::{realtime_broker::MessagePublisher, room_database::RoomDatabase},
 };
 
 type RoomResult<T> = Result<T, RoomError>;
@@ -109,6 +109,33 @@ pub async fn get_all_public_rooms(db: Arc<impl RoomDatabase>) -> RoomResult<Vec<
     Ok(rooms)
 }
 
+pub async fn send_message(
+    db: Arc<impl RoomDatabase>,
+    room_id: Uuid,
+    user_id: Uuid,
+    content: String,
+    message_publisher: Arc<impl MessagePublisher>,
+) -> RoomResult<()> {
+    let message = Message {
+        id: Uuid::new_v4(),
+        room_id,
+        sender_id: user_id,
+        content,
+        created_at: Utc::now(),
+    };
+
+    db.create_message(message.clone())
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    message_publisher
+        .broadcast_message(message)
+        .await
+        .map_err(|err| RoomError::BroadcastError(err.to_string()))?;
+
+    Ok(())
+}
+
 #[derive(Error, Debug)]
 pub enum RoomError {
     #[error("database Error")]
@@ -117,4 +144,6 @@ pub enum RoomError {
     PasswordHashError(String),
     #[error("pasword not given")]
     PasswordNotGiven,
+    #[error("broadcast error")]
+    BroadcastError(String),
 }
