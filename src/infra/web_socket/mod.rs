@@ -23,10 +23,8 @@ pub async fn ws_handler(
     Query(WsAuth { token }): Query<WsAuth>,
     State(state): State<AppState>,
 ) -> Response {
-    let user_id;
-
-    match extract_user_id_from_jwt(token, &state.jwt_secret) {
-        Ok(id) => user_id = id,
+    let user_id = match extract_user_id_from_jwt(token, &state.jwt_secret) {
+        Ok(id) => id,
         Err(res) => return res,
     };
 
