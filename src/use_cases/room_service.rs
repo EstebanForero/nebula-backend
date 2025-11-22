@@ -194,3 +194,55 @@ pub enum RoomError {
     #[error("enqueue message error: {0}")]
     EnqueueMessageError(String),
 }
+
+#[cfg(test)]
+mod test {
+    use std::sync::Arc;
+
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    use crate::{
+        domain::room::{Room, RoomVisibility},
+        use_cases::{room_database::MockRoomDatabase, room_service::user_is_in_room},
+    };
+
+    #[tokio::test]
+    async fn test_user_is_in_room_true() {
+        let mut db = MockRoomDatabase::new();
+
+        let user_id = Uuid::new_v4();
+        let room_id = Uuid::new_v4();
+
+        db.expect_get_user_rooms().returning(move |_| {
+            Ok(vec![Room {
+                id: room_id,
+                name: "test".into(),
+                visibility: RoomVisibility::Public,
+                password_hash: None,
+                created_by: user_id,
+                created_at: Utc::now(),
+            }])
+        });
+
+        let result = user_is_in_room(Arc::new(db), user_id, room_id)
+            .await
+            .unwrap();
+        assert!(result);
+    }
+
+    #[tokio::test]
+    async fn test_user_is_in_room_false() {
+        let mut db = MockRoomDatabase::new();
+
+        let user_id = Uuid::new_v4();
+
+        db.expect_get_user_rooms().returning(|_| Ok(vec![]));
+
+        let result = user_is_in_room(Arc::new(db), user_id, Uuid::new_v4())
+            .await
+            .unwrap();
+
+        assert!(!result);
+    }
+}
