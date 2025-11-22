@@ -79,6 +79,7 @@ async fn main() {
         rooms_channels.clone(),
         message_publisher,
         rabbit_mq,
+        env_vars.dev_mode,
     )
     .await;
 }
