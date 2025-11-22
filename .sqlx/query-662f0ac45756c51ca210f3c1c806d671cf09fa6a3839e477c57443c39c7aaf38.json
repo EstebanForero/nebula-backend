@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM users WHERE id = $1",
+  "query": "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -10,12 +10,12 @@
       },
       {
         "ordinal": 1,
-        "name": "username",
+        "name": "name",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "email",
+        "name": "visibility",
         "type_info": "Text"
       },
       {
@@ -25,28 +25,13 @@
       },
       {
         "ordinal": 4,
-        "name": "created_at",
-        "type_info": "Timestamptz"
+        "name": "created_by",
+        "type_info": "Uuid"
       },
       {
         "ordinal": 5,
-        "name": "updated_at",
+        "name": "created_at",
         "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 6,
-        "name": "webpush_endpoint",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 7,
-        "name": "webpush_p256dh",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 8,
-        "name": "webpush_auth",
-        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -58,13 +43,10 @@
       false,
       false,
       false,
-      false,
-      false,
-      false,
       true,
-      true,
-      true
+      false,
+      false
     ]
   },
-  "hash": "843923b9a0257cf80f1dff554e7dc8fdfc05f489328e8376513124dfb42996e3"
+  "hash": "662f0ac45756c51ca210f3c1c806d671cf09fa6a3839e477c57443c39c7aaf38"
 }

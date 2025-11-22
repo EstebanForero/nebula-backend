@@ -50,24 +50,36 @@ impl UserDatabase for PostgresDatabase {
     }
 
     async fn get_user_by_username(&self, username: String) -> UserDatabaseResult<User> {
-        sqlx::query_as!(User, "SELECT * FROM users WHERE username = $1", username)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+        sqlx::query_as!(
+            User,
+            "SELECT id, username, email, created_at, updated_at, password_hash FROM users WHERE username = $1",
+            username
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
     }
 
     async fn get_user_by_email(&self, email: String) -> UserDatabaseResult<User> {
-        sqlx::query_as!(User, "SELECT * FROM users WHERE email = $1", email)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+        sqlx::query_as!(
+            User,
+            "SELECT password_hash, id, username, email, created_at, updated_at FROM users WHERE email = $1",
+            email
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
     }
 
     async fn get_user_by_id(&self, id: Uuid) -> UserDatabaseResult<User> {
-        sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
+        sqlx::query_as!(
+            User,
+            "SELECT password_hash, id, username, email, created_at, updated_at FROM users WHERE id = $1",
+            id
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|err| UserDatabaseError::InternalDBError(err.to_string()))
     }
 }
 
@@ -201,7 +213,7 @@ impl RoomDatabase for PostgresDatabase {
     async fn get_room_members(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<User>> {
         let users = sqlx::query_as!(
             User,
-            "SELECT * FROM users WHERE id IN (SELECT user_id FROM room_members WHERE room_id = $1)",
+            "SELECT password_hash, id, username, email, created_at, updated_at FROM users WHERE id IN (SELECT user_id FROM room_members WHERE room_id = $1)",
             room_id
         )
         .fetch_all(&self.pool)

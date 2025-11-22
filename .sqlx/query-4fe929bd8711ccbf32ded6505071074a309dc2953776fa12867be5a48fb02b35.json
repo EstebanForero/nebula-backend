@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM users WHERE username = $1",
+  "query": "SELECT * FROM users WHERE id IN (SELECT user_id FROM room_members WHERE room_id = $1)",
   "describe": {
     "columns": [
       {
@@ -51,7 +51,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -66,5 +66,5 @@
       true
     ]
   },
-  "hash": "606364c79e0990deb07dfbe6c32b3d302d083ec5333f3a5ce04113c38a041100"
+  "hash": "4fe929bd8711ccbf32ded6505071074a309dc2953776fa12867be5a48fb02b35"
 }

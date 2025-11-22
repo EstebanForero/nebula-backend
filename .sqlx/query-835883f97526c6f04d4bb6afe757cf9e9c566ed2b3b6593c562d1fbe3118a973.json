@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM rooms WHERE id = (SELECT room_id FROM room_members WHERE user_id = $1)",
+  "query": "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE visibility = 'public' ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
@@ -16,17 +16,7 @@
       {
         "ordinal": 2,
         "name": "visibility",
-        "type_info": {
-          "Custom": {
-            "name": "room_visibility",
-            "kind": {
-              "Enum": [
-                "public",
-                "private"
-              ]
-            }
-          }
-        }
+        "type_info": "Text"
       },
       {
         "ordinal": 3,
@@ -45,9 +35,7 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -58,5 +46,5 @@
       false
     ]
   },
-  "hash": "615f3c45ccd8e057a0e406ec228797ed057938bf5382da1c3d11e80329ddcdf7"
+  "hash": "835883f97526c6f04d4bb6afe757cf9e9c566ed2b3b6593c562d1fbe3118a973"
 }
