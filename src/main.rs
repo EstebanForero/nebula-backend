@@ -28,6 +28,7 @@ struct EnvVariables {
     rabbitmq_port: u16,
     rabbitmq_username: String,
     rabbitmq_password: String,
+    rabbitmq_vhost: String,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -49,12 +50,14 @@ async fn main() {
 
     let rooms_channels = Arc::new(DashMap::new());
 
+    info!("Initializating rabbit mq");
     let rabbit_mq = Arc::new(
         RabbitMQ::new(
             &env_vars.rabbitmq_host,
             env_vars.rabbitmq_port,
             &env_vars.rabbitmq_username,
             &env_vars.rabbitmq_password,
+            &env_vars.rabbitmq_vhost,
         )
         .await,
     );

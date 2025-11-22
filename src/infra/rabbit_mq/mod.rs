@@ -12,15 +12,22 @@ use amqprs::{
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::error;
 
 pub struct RabbitMQ {
     channel: Arc<Mutex<Channel>>,
 }
 
 impl RabbitMQ {
-    pub async fn new(host: &str, port: u16, username: &str, password: &str) -> RabbitMQ {
+    pub async fn new(
+        host: &str,
+        port: u16,
+        username: &str,
+        password: &str,
+        vhost: &str,
+    ) -> RabbitMQ {
         loop {
-            if let Ok(rabbit) = Self::try_connect(host, port, username, password).await {
+            if let Ok(rabbit) = Self::try_connect(host, port, username, password, vhost).await {
                 return rabbit;
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
@@ -32,11 +39,14 @@ impl RabbitMQ {
         port: u16,
         username: &str,
         password: &str,
+        vhost: &str,
     ) -> Result<RabbitMQ, ()> {
         let mut args = OpenConnectionArguments::new(host, port, username, password);
-        args.virtual_host("/").heartbeat(60);
+        args.virtual_host(vhost).heartbeat(60);
 
-        let connection = Connection::open(&args).await.map_err(|_| ())?;
+        let connection = Connection::open(&args)
+            .await
+            .map_err(|err| error!("Error connecting rabbit mq: {err}"))?;
         connection
             .register_callback(DefaultConnectionCallback)
             .await

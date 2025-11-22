@@ -9,6 +9,7 @@ use axum::{
 };
 use dashmap::DashMap;
 use tokio::sync::broadcast;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -71,7 +72,8 @@ pub async fn start_http_api(
         .route("/login", post(login_end))
         .with_state(auth_state);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr.clone()).await.unwrap();
+    info!("Starting server in: {addr}");
     axum::serve(listener, app).await.unwrap();
 }
 
