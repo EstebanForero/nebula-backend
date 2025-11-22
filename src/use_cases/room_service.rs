@@ -261,7 +261,11 @@ mod test {
 
     use crate::{
         domain::room::{Room, RoomVisibility},
-        use_cases::{room_database::MockRoomDatabase, room_service::user_is_in_room},
+        use_cases::{
+            notification_service::MockNotificationService,
+            room_database::MockRoomDatabase,
+            room_service::{RoomError, join_room, user_is_in_room},
+        },
     };
 
     #[tokio::test]
@@ -301,5 +305,93 @@ mod test {
             .unwrap();
 
         assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn join_public_room_ok() {
+        let mut db = MockRoomDatabase::new();
+        let mut notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        db.expect_get_room().returning(move |_| {
+            Ok(Room {
+                id: room_id,
+                name: "Public".into(),
+                visibility: RoomVisibility::Public,
+                password_hash: None,
+                created_by: user_id,
+                created_at: Utc::now(),
+            })
+        });
+
+        db.expect_create_room_membership().returning(|_| Ok(()));
+
+        notif
+            .expect_send_room_member_notification()
+            .returning(|_| Ok(()));
+
+        let res = join_room(Arc::new(db), room_id, user_id, None, Arc::new(notif)).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn join_private_room_without_password_fails() {
+        let mut db = MockRoomDatabase::new();
+        let notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        db.expect_get_room().returning(move |_| {
+            Ok(Room {
+                id: room_id,
+                name: "Private".into(),
+                visibility: RoomVisibility::Private,
+                password_hash: Some("$2b$12$somehashhere".into()),
+                created_by: user_id,
+                created_at: Utc::now(),
+            })
+        });
+
+        let res = join_room(Arc::new(db), room_id, user_id, None, Arc::new(notif)).await;
+
+        assert!(matches!(res, Err(RoomError::PasswordNotGiven)));
+    }
+
+    #[tokio::test]
+    async fn join_private_room_wrong_password_fails() {
+        let mut db = MockRoomDatabase::new();
+        let notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        // Hash of "correct123"
+        let valid_hash = bcrypt::hash("correct123", bcrypt::DEFAULT_COST).unwrap();
+
+        db.expect_get_room().returning(move |_| {
+            Ok(Room {
+                id: room_id,
+                name: "Private".into(),
+                visibility: RoomVisibility::Private,
+                password_hash: Some(valid_hash.clone()),
+                created_by: user_id,
+                created_at: Utc::now(),
+            })
+        });
+
+        let res = join_room(
+            Arc::new(db),
+            room_id,
+            user_id,
+            Some("wrongpass".into()),
+            Arc::new(notif),
+        )
+        .await;
+
+        assert!(matches!(res, Err(RoomError::InvalidRoomPassword)));
     }
 }
