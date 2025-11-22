@@ -16,7 +16,7 @@ use tracing::error;
 
 pub struct RabbitMQ {
     channel: Arc<Mutex<Channel>>,
-    _connection: connection,
+    _connection: Connection,
 }
 
 impl RabbitMQ {
@@ -62,6 +62,7 @@ impl RabbitMQ {
 
         Ok(RabbitMQ {
             channel: Arc::new(Mutex::new(channel)),
+            _connection: connection,
         })
     }
 }
