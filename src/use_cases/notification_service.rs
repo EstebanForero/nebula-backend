@@ -1,18 +1,34 @@
 use mockall::automock;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use uuid::Uuid;
 
-use crate::domain::room::Message;
+pub type NotificationServiceResult<T> = Result<T, NotificationServiceError>;
 
-pub type MessageProcessingResult<T> = Result<T, MessageProcessingError>;
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoomAction {
+    JoinedRoom,
+    LeftRoom,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct RoomMemberNotification {
+    pub user_id: Uuid,
+    pub room_id: Uuid,
+    pub action: RoomAction,
+}
 
 #[automock]
-pub trait NotificationProcessing: Send + Sync {
-    /// enqueues message for any kind of future processing or analitics
-    async fn enqueue_message(&self, message: Message) -> MessageProcessingResult<()>;
+pub trait NotificationService: Send + Sync {
+    async fn send_room_member_notification(
+        &self,
+        message: RoomMemberNotification,
+    ) -> NotificationServiceResult<()>;
 }
 
 #[derive(Debug, Error)]
-pub enum MessageProcessingError {
+pub enum NotificationServiceError {
     #[error("Internal broker error: {0}")]
     MessageProcessingError(String),
 }

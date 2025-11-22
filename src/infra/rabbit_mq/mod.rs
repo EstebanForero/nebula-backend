@@ -1,9 +1,3 @@
-use crate::{
-    domain::room::Message,
-    use_cases::notification_processing::{
-        MessageProcessing, MessageProcessingError, MessageProcessingResult,
-    },
-};
 use amqprs::{
     BasicProperties,
     callbacks::{DefaultChannelCallback, DefaultConnectionCallback},
@@ -12,7 +6,12 @@ use amqprs::{
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::error;
+use tracing::{error, info};
+
+use crate::use_cases::notification_service::{
+    NotificationService, NotificationServiceError, NotificationServiceResult,
+    RoomMemberNotification,
+};
 
 pub struct RabbitMQ {
     channel: Arc<Mutex<Channel>>,
@@ -28,10 +27,16 @@ impl RabbitMQ {
         vhost: &str,
     ) -> RabbitMQ {
         loop {
-            if let Ok(rabbit) = Self::try_connect(host, port, username, password, vhost).await {
-                return rabbit;
+            match Self::try_connect(host, port, username, password, vhost).await {
+                Ok(rabbit) => {
+                    info!("RabbitMQ connected and queue 'room_member_notifications' ready");
+                    return rabbit;
+                }
+                Err(_) => {
+                    error!("Failed to connect to RabbitMQ, retrying in 3s...");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                }
             }
-            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         }
     }
 
@@ -44,21 +49,25 @@ impl RabbitMQ {
     ) -> Result<RabbitMQ, ()> {
         let mut args = OpenConnectionArguments::new(host, port, username, password);
         args.virtual_host(vhost).heartbeat(60);
+
         let connection = Connection::open(&args)
             .await
-            .map_err(|err| error!("Error connecting rabbit mq: {err}"))?;
+            .map_err(|err| error!("Error connecting to RabbitMQ: {err}"))?;
+
         connection
             .register_callback(DefaultConnectionCallback)
             .await
             .ok();
+
         let channel = connection.open_channel(None).await.map_err(|_| ())?;
         channel.register_callback(DefaultChannelCallback).await.ok();
 
-        let queue_args = QueueDeclareArguments::durable_client_named("chat_messages")
+        let queue_args = QueueDeclareArguments::durable_client_named("room_member_notifications")
             .durable(true)
             .auto_delete(false)
             .finish();
-        let _ = channel
+
+        channel
             .queue_declare(queue_args)
             .await
             .map_err(|e| error!("Failed to declare queue: {e}"))?;
@@ -75,18 +84,24 @@ impl RabbitMQ {
     }
 }
 
-impl MessageProcessing for RabbitMQ {
-    async fn enqueue_message(&self, message: Message) -> MessageProcessingResult<()> {
+impl NotificationService for RabbitMQ {
+    async fn send_room_member_notification(
+        &self,
+        message: RoomMemberNotification,
+    ) -> NotificationServiceResult<()> {
         let payload = serde_json::to_vec(&message)
-            .map_err(|e| MessageProcessingError::MessageProcessingError(e.to_string()))?;
-        let publish_args = BasicPublishArguments::new("", "chat_messages");
-        let properties = BasicProperties::default().with_delivery_mode(2).finish();
+            .map_err(|e| NotificationServiceError::MessageProcessingError(e.to_string()))?;
+
+        let args = BasicPublishArguments::new("", "room_member_notifications");
+        let props = BasicProperties::default().with_delivery_mode(2).finish();
+
         self.channel
             .lock()
             .await
-            .basic_publish(properties, payload, publish_args)
+            .basic_publish(props, payload, args)
             .await
-            .map_err(|e| MessageProcessingError::MessageProcessingError(e.to_string()))?;
+            .map_err(|e| NotificationServiceError::MessageProcessingError(e.to_string()))?;
+
         Ok(())
     }
 }
