@@ -115,8 +115,8 @@ mod test {
     use crate::{
         domain::user::User,
         use_cases::{
-            auth_service::{Claims, login, register},
-            user_database::MockUserDatabase,
+            auth_service::{AuthError, Claims, get_user_by_id_use, login, register},
+            user_database::{MockUserDatabase, UserDatabaseError},
         },
     };
 
@@ -218,5 +218,43 @@ mod test {
 
         let clamis: Claims = decode(token, &DecodingKey::from_secret("swNItsMArrAbN2ueHZBWBA5Nk6N8zKWoybXhMK0EuhHso2IvCiFyQAIb6m_8SmicCRZ2x2nEHkxXgCYAoN3-XA".as_ref()), &Validation::default()).unwrap().claims;
         assert_eq!(clamis.sub, format!("{}", user_id))
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_id_success() {
+        let mut db = MockUserDatabase::new();
+
+        let user_id = Uuid::new_v4();
+
+        let expected_user = User {
+            id: user_id,
+            username: "john".into(),
+            email: "john@example.com".into(),
+            password_hash: "hashed".into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let copy = expected_user.clone();
+
+        db.expect_get_user_by_id()
+            .returning(move |_| Ok(copy.clone()));
+
+        let result = get_user_by_id_use(Arc::new(db), user_id).await.unwrap();
+
+        assert_eq!(result.id, expected_user.clone().id);
+        assert_eq!(result.username, expected_user.clone().username);
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_id_database_error() {
+        let mut db = MockUserDatabase::new();
+
+        db.expect_get_user_by_id()
+            .returning(|_| Err(UserDatabaseError::InternalDBError("db failure".to_string())));
+
+        let result = get_user_by_id_use(Arc::new(db), Uuid::new_v4()).await;
+
+        assert!(matches!(result, Err(AuthError::DatabaseError(_))));
     }
 }
