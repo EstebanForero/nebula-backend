@@ -9,6 +9,7 @@ use crate::{
     infra::{
         database::PostgresDatabase,
         http_api::start_http_api,
+        rabbit_mq::RabbitMQ,
         redis::{RedisConsumer, RedisPublisher},
     },
     use_cases::{realtime_service::realtime_messsage_broker, user_database::UserDatabase},
@@ -23,6 +24,10 @@ struct EnvVariables {
     database_url: String,
     jwt_secret: String,
     redis_url: String,
+    rabbitmq_host: String,
+    rabbitmq_port: u16,
+    rabbitmq_username: String,
+    rabbitmq_password: String,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -43,6 +48,14 @@ async fn main() {
     .await;
 
     let rooms_channels = Arc::new(DashMap::new());
+
+    let rabbit_mq = RabbitMQ::new(
+        &env_vars.rabbitmq_host,
+        env_vars.rabbitmq_port,
+        &env_vars.rabbitmq_username,
+        &env_vars.rabbitmq_password,
+    )
+    .await;
 
     let addr = "0.0.0.0:3838".to_string();
 
