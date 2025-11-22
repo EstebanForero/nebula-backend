@@ -11,8 +11,8 @@ use crate::{
     domain::room::RoomVisibility,
     infra::http_api::AppState,
     use_cases::room_service::{
-        create_room, get_all_public_rooms, get_user_rooms_use, join_room, obtain_messages,
-        obtain_room_members, send_message, user_is_in_room,
+        create_room, get_all_public_rooms, get_user_rooms_use, join_room, leave_room,
+        obtain_messages, obtain_room_members, send_message, user_is_in_room,
     },
 };
 
@@ -21,6 +21,12 @@ pub struct RoomInfo {
     password: Option<String>,
     name: String,
     visibility: RoomVisibility,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct JoinRoomInfo {
+    password: Option<String>,
+    room_id: Uuid,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -58,9 +64,28 @@ pub async fn create_room_end(
 pub async fn join_room_end(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
+    Json(join_room_info): Json<JoinRoomInfo>,
+) -> impl IntoResponse {
+    match join_room(
+        state.db,
+        join_room_info.room_id,
+        user_id,
+        join_room_info.password,
+        state.rabbit_mq,
+    )
+    .await
+    {
+        Ok(_) => (StatusCode::OK, "".to_string()),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+pub async fn leave_room_end(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<Uuid>,
     Path(room_id): Path<Uuid>,
 ) -> impl IntoResponse {
-    match join_room(state.db, room_id, user_id).await {
+    match leave_room(state.db, state.rabbit_mq, room_id, user_id).await {
         Ok(_) => (StatusCode::OK, "".to_string()),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }

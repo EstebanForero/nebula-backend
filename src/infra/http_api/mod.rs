@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Router, middleware,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use dashmap::DashMap;
 use tokio::sync::broadcast;
@@ -20,7 +20,7 @@ use crate::{
         http_api::{
             room_endpoints::{
                 create_room_end, get_all_public_rooms_end, get_messages, get_room_members_end,
-                get_user_rooms_end, join_room_end, send_message_end,
+                get_user_rooms_end, join_room_end, leave_room_end, send_message_end,
             },
             user_endpoints::{get_user_info_end, login_end, register_end},
         },
@@ -64,10 +64,11 @@ pub async fn start_http_api(
         .route("/rooms/public", get(get_all_public_rooms_end))
         .route("/rooms", get(get_user_rooms_end))
         .route("/room", post(create_room_end))
-        .route("/room/join/{room_id}", post(join_room_end))
+        .route("/room/join", post(join_room_end))
         .route("/message", post(send_message_end).get(get_messages))
         .route("/me", get(get_user_info_end))
         .route("/room/members/{room_id}", get(get_room_members_end))
+        .route("/leave/{room_id}", delete(leave_room_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,

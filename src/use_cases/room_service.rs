@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bcrypt::{DEFAULT_COST, hash};
+use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::Utc;
 use thiserror::Error;
 use uuid::Uuid;
@@ -10,7 +10,11 @@ use crate::{
         room::{MemberRole, Message, Room, RoomMember, RoomVisibility},
         user::User,
     },
-    use_cases::{realtime_broker::MessagePublisher, room_database::RoomDatabase},
+    use_cases::{
+        notification_service::{NotificationService, RoomMemberNotification},
+        realtime_broker::MessagePublisher,
+        room_database::RoomDatabase,
+    },
 };
 
 type RoomResult<T> = Result<T, RoomError>;
@@ -76,7 +80,13 @@ pub async fn create_room(
     Ok(())
 }
 
-pub async fn join_room(db: Arc<impl RoomDatabase>, room_id: Uuid, user_id: Uuid) -> RoomResult<()> {
+pub async fn join_room(
+    db: Arc<impl RoomDatabase>,
+    room_id: Uuid,
+    user_id: Uuid,
+    password: Option<String>,
+    notification_service: Arc<impl NotificationService>,
+) -> RoomResult<()> {
     let room_member = RoomMember {
         room_id,
         user_id,
@@ -84,9 +94,61 @@ pub async fn join_room(db: Arc<impl RoomDatabase>, room_id: Uuid, user_id: Uuid)
         joined_at: Utc::now(),
     };
 
+    let notification = RoomMemberNotification {
+        user_id,
+        room_id,
+        action: super::notification_service::RoomAction::JoinedRoom,
+    };
+
+    let room = db
+        .get_room(room_id)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    if room.visibility == RoomVisibility::Private && password.is_none() {
+        return Err(RoomError::PasswordNotGiven);
+    }
+
+    if room.visibility == RoomVisibility::Private && password.is_some() {
+        let ver = verify(password.unwrap(), &room.password_hash.unwrap())
+            .map_err(|err| RoomError::BcryptError(err.to_string()))?;
+        if !ver {
+            return Err(RoomError::InvalidRoomPassword);
+        }
+    }
+
     db.create_room_membership(room_member)
         .await
         .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    notification_service
+        .send_room_member_notification(notification)
+        .await
+        .map_err(|err| RoomError::NotificationError(err.to_string()))?;
+
+    Ok(())
+}
+
+pub async fn leave_room(
+    db: Arc<impl RoomDatabase>,
+    notification_service: Arc<impl NotificationService>,
+    room_id: Uuid,
+    user_id: Uuid,
+) -> RoomResult<()> {
+    let notification = RoomMemberNotification {
+        user_id,
+        room_id,
+        action: super::notification_service::RoomAction::LeftRoom,
+    };
+
+    db.delete_room_membership(room_id, user_id)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    notification_service
+        .send_room_member_notification(notification)
+        .await
+        .map_err(|err| RoomError::NotificationError(err.to_string()))?;
 
     Ok(())
 }
@@ -176,14 +238,18 @@ pub async fn obtain_room_members(
 pub enum RoomError {
     #[error("database Error {0}")]
     DatabaseError(String),
-    #[error("hashing error")]
+    #[error("hashing error {0}")]
     PasswordHashError(String),
     #[error("pasword not given")]
     PasswordNotGiven,
-    #[error("broadcast error")]
+    #[error("broadcast error {0}")]
     BroadcastError(String),
-    #[error("enqueue message error: {0}")]
-    EnqueueMessageError(String),
+    #[error("notification error: {0}")]
+    NotificationError(String),
+    #[error("invalid room password")]
+    InvalidRoomPassword,
+    #[error("encryt error: {0}")]
+    BcryptError(String),
 }
 
 #[cfg(test)]
