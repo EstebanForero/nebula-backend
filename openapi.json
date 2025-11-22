@@ -3,20 +3,24 @@
   "info": {
     "title": "Nebula Chat API",
     "version": "1.0.0",
-    "description": "REST API for the Nebula real-time chat application (rooms, messages, users, notifications integration)."
+    "description": "REST API for the Nebula real-time chat application. It includes authentication, room management, messaging, user profile access, metrics for observability, WebSocket endpoints for real-time communication, and a separate notification service for Web Push subscriptions."
   },
   "servers": [
     {
       "url": "http://localhost:3838",
-      "description": "Local development"
+      "description": "Nebula main backend (auth, rooms, messages, users, metrics, WebSocket)"
+    },
+    {
+      "url": "http://localhost:3010",
+      "description": "Nebula notification service (WebPush subscriptions)"
     }
   ],
   "paths": {
     "/health": {
       "get": {
         "tags": ["Health"],
-        "summary": "Auth service health check",
-        "description": "Checks that the authenticated API is up and the current token is valid.",
+        "summary": "Authenticated health check",
+        "description": "Checks that the API is running and that the current JWT token is valid. Useful for verifying authentication and service availability from an authenticated client.",
         "security": [
           {
             "bearerAuth": []
@@ -24,7 +28,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Service is healthy",
+            "description": "Service is healthy and token is valid",
             "content": {
               "application/json": {
                 "schema": {
@@ -34,7 +38,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid token",
+            "description": "Unauthorized or invalid/expired token",
             "content": {
               "application/json": {
                 "schema": {
@@ -46,10 +50,31 @@
         }
       }
     },
+    "/": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Basic service health check (no auth)",
+        "description": "Lightweight health endpoint that returns a simple success response if the service is up. Does not require authentication and can be used by load balancers or uptime monitors.",
+        "responses": {
+          "200": {
+            "description": "Service is running",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "OK"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "tags": ["Auth"],
-        "summary": "Register a new user",
+        "summary": "Register a new user account",
+        "description": "Creates a new user with a unique username and email address. The password is stored securely (e.g., hashed) on the server. After registration, the user can call the login endpoint to obtain a JWT.",
         "requestBody": {
           "required": true,
           "content": {
@@ -72,7 +97,7 @@
             }
           },
           "400": {
-            "description": "Invalid registration data",
+            "description": "Invalid registration data (e.g., malformed email, weak password, missing fields)",
             "content": {
               "application/json": {
                 "schema": {
@@ -82,7 +107,7 @@
             }
           },
           "409": {
-            "description": "User with same email or username already exists",
+            "description": "A user with the same username or email already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -97,7 +122,8 @@
     "/auth/login": {
       "post": {
         "tags": ["Auth"],
-        "summary": "Login and obtain a JWT access token",
+        "summary": "Authenticate a user and obtain a JWT",
+        "description": "Authenticates a user using either username or email plus password. On success, returns a JWT token that must be sent in the Authorization header (Bearer scheme) for authenticated endpoints.",
         "requestBody": {
           "required": true,
           "content": {
@@ -110,17 +136,25 @@
         },
         "responses": {
           "200": {
-            "description": "Login successful, returns a JWT access token",
+            "description": "Login successful. Returns an access token that can be used for authenticated requests.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LoginResponse"
+                    },
+                    {
+                      "type": "string",
+                      "description": "Raw JWT token as plain text (alternative implementation)."
+                    }
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid credentials format",
+            "description": "Invalid request payload (e.g., missing identifier or password)",
             "content": {
               "application/json": {
                 "schema": {
@@ -130,7 +164,7 @@
             }
           },
           "401": {
-            "description": "Invalid username/email or password",
+            "description": "Invalid credentials (wrong username/email or password)",
             "content": {
               "application/json": {
                 "schema": {
@@ -146,7 +180,7 @@
       "get": {
         "tags": ["Rooms"],
         "summary": "List all public rooms",
-        "description": "Returns a list of rooms with visibility 'public'.",
+        "description": "Returns a list of chat rooms that are publicly visible. These rooms can be browsed by authenticated users and joined if allowed by the room settings.",
         "security": [
           {
             "bearerAuth": []
@@ -167,7 +201,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -183,7 +217,7 @@
       "get": {
         "tags": ["Rooms"],
         "summary": "List rooms for the current user",
-        "description": "Returns rooms where the authenticated user is a member (or owner).",
+        "description": "Returns the rooms where the authenticated user is a member or owner. This acts as the user's personal room list in the application.",
         "security": [
           {
             "bearerAuth": []
@@ -191,7 +225,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of rooms for current user",
+            "description": "List of rooms associated with the current user",
             "content": {
               "application/json": {
                 "schema": {
@@ -204,7 +238,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -217,7 +251,8 @@
       },
       "post": {
         "tags": ["Rooms"],
-        "summary": "Create a new room",
+        "summary": "Create a new chat room",
+        "description": "Creates a new chat room owned by the authenticated user. Rooms can be public or private. Private rooms may be protected by a password that is required when other users attempt to join.",
         "security": [
           {
             "bearerAuth": []
@@ -245,7 +280,7 @@
             }
           },
           "400": {
-            "description": "Invalid room data",
+            "description": "Invalid room data (e.g., missing name or unsupported visibility)",
             "content": {
               "application/json": {
                 "schema": {
@@ -255,7 +290,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -271,6 +306,7 @@
       "get": {
         "tags": ["Room Membership"],
         "summary": "List members of a room",
+        "description": "Returns the list of users who are currently members of the specified room. The caller must typically be a member of the room to view membership details, depending on business rules.",
         "security": [
           {
             "bearerAuth": []
@@ -281,7 +317,7 @@
             "name": "room_id",
             "in": "path",
             "required": true,
-            "description": "ID of the room",
+            "description": "ID of the room whose members should be listed",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -303,7 +339,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -313,7 +349,7 @@
             }
           },
           "403": {
-            "description": "Forbidden (no access to this room)",
+            "description": "Forbidden (current user is not allowed to view room members)",
             "content": {
               "application/json": {
                 "schema": {
@@ -337,7 +373,7 @@
       "post": {
         "tags": ["Room Membership"],
         "summary": "Join a room",
-        "description": "Join a room. For private rooms, a password may be required.",
+        "description": "Adds the current user as a member of the specified room. For private rooms, a password may be required. On success, returns the room information.",
         "security": [
           {
             "bearerAuth": []
@@ -367,7 +403,7 @@
         },
         "responses": {
           "200": {
-            "description": "Joined room successfully, returns the room",
+            "description": "Joined the room successfully. Returns the room resource.",
             "content": {
               "application/json": {
                 "schema": {
@@ -377,7 +413,7 @@
             }
           },
           "400": {
-            "description": "Invalid join request or invalid password format",
+            "description": "Invalid join request or malformed body (e.g., invalid password format)",
             "content": {
               "application/json": {
                 "schema": {
@@ -387,7 +423,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -397,7 +433,7 @@
             }
           },
           "403": {
-            "description": "Forbidden, invalid room password or no access",
+            "description": "Forbidden (e.g., wrong room password or user banned from room)",
             "content": {
               "application/json": {
                 "schema": {
@@ -423,7 +459,7 @@
       "delete": {
         "tags": ["Room Membership"],
         "summary": "Leave a room",
-        "description": "The current user leaves the specified room.",
+        "description": "Removes the current user from the specified room's membership. After leaving, the user will no longer receive messages from the room via normal room membership (WebSocket subscriptions might also be closed or invalidated on the client side).",
         "security": [
           {
             "bearerAuth": []
@@ -443,10 +479,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Left room successfully (no content)"
+            "description": "Successfully left the room (no response body)"
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -456,7 +492,7 @@
             }
           },
           "404": {
-            "description": "Room or membership not found",
+            "description": "Room not found or user is not a member of the room",
             "content": {
               "application/json": {
                 "schema": {
@@ -471,8 +507,8 @@
     "/rooms/{room_id}/messages": {
       "get": {
         "tags": ["Messages"],
-        "summary": "Get messages for a room (paginated)",
-        "description": "Returns messages for a room, optionally paginated by page and page_size.",
+        "summary": "List messages in a room (paginated)",
+        "description": "Returns the messages for a given room. The result can be paginated using the `page` and `page_size` query parameters. Messages are typically ordered by creation time (e.g., newest first or oldest first depending on implementation).",
         "security": [
           {
             "bearerAuth": []
@@ -483,7 +519,7 @@
             "name": "room_id",
             "in": "path",
             "required": true,
-            "description": "ID of the room",
+            "description": "ID of the room whose messages should be retrieved",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -497,7 +533,7 @@
               "type": "integer",
               "minimum": 1
             },
-            "description": "Page number (1-based)"
+            "description": "Page number (1-based index). If omitted, defaults to the first page."
           },
           {
             "name": "page_size",
@@ -508,12 +544,12 @@
               "minimum": 1,
               "maximum": 100
             },
-            "description": "Number of messages per page"
+            "description": "Number of messages per page. If omitted, a server default is used."
           }
         ],
         "responses": {
           "200": {
-            "description": "List of messages for the room",
+            "description": "List of messages in the room for the requested page",
             "content": {
               "application/json": {
                 "schema": {
@@ -526,7 +562,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -536,7 +572,7 @@
             }
           },
           "403": {
-            "description": "Forbidden, user not a member of the room",
+            "description": "Forbidden (user is not a member of the room)",
             "content": {
               "application/json": {
                 "schema": {
@@ -560,6 +596,7 @@
       "post": {
         "tags": ["Messages"],
         "summary": "Send a message to a room",
+        "description": "Creates a new message in the specified room on behalf of the authenticated user. The message is persisted in the database and broadcast to connected WebSocket clients in real time.",
         "security": [
           {
             "bearerAuth": []
@@ -570,7 +607,7 @@
             "name": "room_id",
             "in": "path",
             "required": true,
-            "description": "ID of the room",
+            "description": "ID of the room to which the message is sent",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -599,7 +636,7 @@
             }
           },
           "400": {
-            "description": "Invalid message payload",
+            "description": "Invalid message content or malformed request body",
             "content": {
               "application/json": {
                 "schema": {
@@ -609,7 +646,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -619,7 +656,7 @@
             }
           },
           "403": {
-            "description": "Forbidden, user not a member of the room",
+            "description": "Forbidden (user is not a member of the room)",
             "content": {
               "application/json": {
                 "schema": {
@@ -645,6 +682,7 @@
       "get": {
         "tags": ["Users"],
         "summary": "Get current user profile",
+        "description": "Returns the profile information for the currently authenticated user, including id, username, email and timestamps.",
         "security": [
           {
             "bearerAuth": []
@@ -652,7 +690,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Current user profile",
+            "description": "Current user profile returned successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -662,7 +700,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized (missing or invalid JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -677,15 +715,16 @@
     "/metrics": {
       "get": {
         "tags": ["Monitoring"],
-        "summary": "Prometheus metrics",
-        "description": "Exposes Prometheus metrics for this service in text format.",
+        "summary": "Prometheus metrics endpoint",
+        "description": "Exposes internal metrics of the Nebula backend in the Prometheus text format. This endpoint is typically consumed by Prometheus or other monitoring systems rather than by end users.",
         "responses": {
           "200": {
-            "description": "Prometheus metrics",
+            "description": "Prometheus metrics successfully returned",
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Prometheus metrics in text/plain format."
                 }
               }
             }
@@ -696,14 +735,14 @@
     "/ws/rooms/{room_id}": {
       "get": {
         "tags": ["WebSocket"],
-        "summary": "WebSocket connection for a room",
-        "description": "Upgrades to a WebSocket connection for real-time messaging in a room. Authentication is typically provided via a JWT token query parameter (e.g. ?token=...). This endpoint is not strictly modeled as REST, but documented here for completeness.",
+        "summary": "Connect to a room WebSocket",
+        "description": "Upgrades the HTTP connection to a WebSocket connection for the specified room. The client uses this WebSocket to send and receive real-time chat messages. Authentication is typically provided via a JWT token sent as a query parameter (e.g., `?token=...`).",
         "parameters": [
           {
             "name": "room_id",
             "in": "path",
             "required": true,
-            "description": "ID of the room",
+            "description": "ID of the room for the WebSocket connection",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -713,7 +752,7 @@
             "name": "token",
             "in": "query",
             "required": false,
-            "description": "JWT token used for authenticating the WebSocket connection",
+            "description": "JWT token used to authenticate the WebSocket connection",
             "schema": {
               "type": "string"
             }
@@ -721,10 +760,10 @@
         ],
         "responses": {
           "101": {
-            "description": "Switching Protocols (WebSocket upgrade)"
+            "description": "Switching Protocols (WebSocket upgrade initiated)"
           },
           "400": {
-            "description": "Bad request (e.g. invalid token or missing parameters)",
+            "description": "Bad request (e.g., invalid or missing token, or room_id malformed)",
             "content": {
               "application/json": {
                 "schema": {
@@ -734,7 +773,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized (invalid token)",
+            "description": "Unauthorized (invalid or missing JWT token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -746,19 +785,92 @@
         }
       }
     },
-    "/": {
-      "get": {
-        "tags": ["Health"],
-        "summary": "Basic service health check",
-        "description": "Simple health check endpoint for the service.",
+    "/webpush/subscribe": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Subscribe a client to Web Push notifications",
+        "description": "Registers a Web Push subscription for the authenticated user. The subscription object comes from the browser's Push API (e.g., from `ServiceWorkerRegistration.pushManager.subscribe`). The server stores the subscription so it can later send push notifications (e.g., when a user is mentioned or receives a new room message). This endpoint is served by the Nebula notification service.",
+        "servers": [
+          {
+            "url": "http://localhost:3010",
+            "description": "Notification service (WebPush)"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribeWebPushRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Example WebPush subscription payload",
+                  "value": {
+                    "subscription": {
+                      "endpoint": "https://fcm.googleapis.com/fcm/send/abcd1234",
+                      "keys": {
+                        "p256dh": "BLKW1jJYzExamplePublicKey...",
+                        "auth": "KBhXwExampleAuthSecret"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Service is running",
+            "description": "Subscription registered successfully. Returns a generic response object that may contain metadata (e.g., subscription ID).",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string",
-                  "example": "OK"
+                  "$ref": "#/components/schemas/SubscribeWebPushResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successful subscription",
+                    "value": {
+                      "success": true,
+                      "subscriptionId": "sub_12345"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid subscription payload (e.g., missing endpoint or keys)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing or invalid JWT token in Authorization header)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error (e.g., failure to persist subscription or send confirmation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -772,141 +884,172 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "JWT-based bearer authentication. Send the token as `Authorization: Bearer <token>`."
       }
     },
     "schemas": {
       "RoomVisibility": {
         "type": "string",
-        "enum": ["public", "private"]
+        "enum": ["public", "private"],
+        "description": "Visibility of a room. Public rooms can be discovered and listed by users, while private rooms may require a password or invitation."
       },
       "Room": {
         "type": "object",
+        "description": "Represents a chat room where users can join and exchange messages.",
         "required": ["id", "name", "visibility", "createdBy", "createdAt"],
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Unique identifier of the room."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable name of the room.",
+            "example": "General"
           },
           "visibility": {
             "$ref": "#/components/schemas/RoomVisibility"
           },
           "createdBy": {
             "type": "string",
-            "description": "ID of the user who created the room",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "ID of the user who created the room."
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Timestamp when the room was created."
           }
         }
       },
       "Message": {
         "type": "object",
+        "description": "Represents a chat message sent in a room by a user.",
         "required": ["id", "roomId", "senderId", "content", "createdAt"],
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Unique identifier of the message."
           },
           "roomId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "ID of the room where the message was sent."
           },
           "senderId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "ID of the user who sent the message."
           },
           "content": {
-            "type": "string"
+            "type": "string",
+            "description": "Text content of the message.",
+            "example": "Hello, world!"
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Timestamp when the message was created."
           }
         }
       },
       "User": {
         "type": "object",
+        "description": "Represents a registered user of the Nebula system.",
         "required": ["id", "username", "email", "createdAt", "updatedAt"],
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Unique identifier of the user."
           },
           "username": {
-            "type": "string"
-          },
-          "email": {
             "type": "string",
-            "format": "email"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "RegisterRequest": {
-        "type": "object",
-        "required": ["username", "email", "password"],
-        "properties": {
-          "username": {
-            "type": "string",
+            "description": "Unique username chosen by the user.",
             "example": "nebula_user"
           },
           "email": {
             "type": "string",
             "format": "email",
+            "description": "User's email address.",
             "example": "user@example.com"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the user account was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the user account was last updated."
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "description": "Payload used to register a new user.",
+        "required": ["username", "email", "password"],
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "nebula_user",
+            "description": "Desired unique username for the new user."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com",
+            "description": "Email address for the new user."
           },
           "password": {
             "type": "string",
             "format": "password",
-            "example": "strong_password_123"
+            "example": "strong_password_123",
+            "description": "Password to secure the account."
           }
         }
       },
       "LoginRequest": {
         "type": "object",
+        "description": "Payload used to login a user.",
         "required": ["identifier", "password"],
         "properties": {
           "identifier": {
             "type": "string",
-            "description": "Username or email used to login",
+            "description": "Username or email used to identify the user.",
             "example": "user@example.com"
           },
           "password": {
             "type": "string",
             "format": "password",
+            "description": "Account password.",
             "example": "strong_password_123"
           }
         }
       },
       "LoginResponse": {
         "type": "object",
+        "description": "Structured login response containing an access token.",
         "required": ["access_token"],
         "properties": {
           "access_token": {
             "type": "string",
-            "description": "JWT access token"
+            "description": "JWT access token that can be used in the Authorization header."
           }
         }
       },
       "CreateRoomRequest": {
         "type": "object",
+        "description": "Payload used to create a new room.",
         "required": ["name", "visibility"],
         "properties": {
           "name": {
             "type": "string",
+            "description": "Name of the room.",
             "example": "General"
           },
           "visibility": {
@@ -915,56 +1058,123 @@
           "password": {
             "type": "string",
             "nullable": true,
-            "description": "Password required to join the room if it is private"
+            "description": "Optional password required to join the room if it is private."
           }
         }
       },
       "JoinRoomRequest": {
         "type": "object",
+        "description": "Optional payload used when joining a private room.",
         "properties": {
           "password": {
             "type": "string",
             "nullable": true,
-            "description": "Password for joining private room (if required)"
+            "description": "Password required to join private rooms (if applicable)."
           }
         }
       },
       "SendMessageRequest": {
         "type": "object",
+        "description": "Payload used to send a new message to a room.",
         "required": ["content"],
         "properties": {
           "content": {
             "type": "string",
-            "example": "Hello, world!"
+            "description": "Text content of the message.",
+            "example": "Hello everyone!"
           }
         }
       },
+      "WebPushSubscriptionKeys": {
+        "type": "object",
+        "description": "Cryptographic keys used for Web Push encryption.",
+        "required": ["p256dh", "auth"],
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "description": "P-256 ECDH public key of the subscription."
+          },
+          "auth": {
+            "type": "string",
+            "description": "Authentication secret associated with the subscription."
+          }
+        }
+      },
+      "WebPushSubscription": {
+        "type": "object",
+        "description": "Represents a Web Push subscription as obtained from the browser's Push API.",
+        "required": ["endpoint", "keys"],
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "The push service endpoint URL.",
+            "example": "https://fcm.googleapis.com/fcm/send/abcd1234"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/WebPushSubscriptionKeys"
+          }
+        }
+      },
+      "SubscribeWebPushRequest": {
+        "type": "object",
+        "description": "Payload for registering a Web Push subscription for the current user.",
+        "required": ["subscription"],
+        "properties": {
+          "subscription": {
+            "$ref": "#/components/schemas/WebPushSubscription"
+          }
+        }
+      },
+      "SubscribeWebPushResponse": {
+        "type": "object",
+        "description": "Generic response returned by the Web Push subscription endpoint. The exact shape may vary, but it commonly indicates success and may contain a generated subscription ID.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the subscription was stored successfully.",
+            "example": true
+          },
+          "subscriptionId": {
+            "type": "string",
+            "description": "Optional identifier for the stored subscription.",
+            "example": "sub_12345"
+          }
+        },
+        "additionalProperties": true
+      },
       "HealthStatus": {
         "type": "object",
+        "description": "Represents the health status of the service and subcomponents.",
         "properties": {
           "status": {
             "type": "string",
+            "description": "General health status.",
             "example": "ok"
           },
           "auth": {
             "type": "string",
+            "description": "Status of the auth subsystem.",
             "example": "ok"
           }
         }
       },
       "ErrorResponse": {
         "type": "object",
+        "description": "Standard error response returned on failure.",
         "properties": {
           "code": {
             "type": "string",
+            "description": "Machine-readable error code.",
             "example": "BAD_REQUEST"
           },
           "message": {
             "type": "string",
-            "example": "Invalid input"
+            "description": "Human-readable error message.",
+            "example": "Invalid input data."
           },
           "details": {
             "type": "object",
+            "description": "Optional additional error details.",
             "additionalProperties": true
           }
         }
