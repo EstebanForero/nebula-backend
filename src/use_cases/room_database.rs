@@ -42,7 +42,7 @@ pub trait RoomDatabase: Send + Sync {
         room_id: Uuid,
         page: u32,
         page_size: u8,
-    ) -> RoomDatabaseResult<()>;
+    ) -> RoomDatabaseResult<Vec<Message>>;
 }
 
 #[derive(Debug, Error)]

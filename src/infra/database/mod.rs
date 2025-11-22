@@ -226,7 +226,12 @@ impl RoomDatabase for PostgresDatabase {
         Ok(())
     }
 
-    async fn get_room_messages(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<Message>> {
+    async fn get_room_messages(
+        &self,
+        room_id: Uuid,
+        page: u32,
+        page_size: u8,
+    ) -> RoomDatabaseResult<Vec<Message>> {
         let messages = sqlx::query_as!(
             Message,
             "SELECT * FROM messages WHERE room_id = $1 ORDER BY created_at DESC",
