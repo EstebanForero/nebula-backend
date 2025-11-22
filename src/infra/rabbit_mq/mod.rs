@@ -8,7 +8,7 @@ use amqprs::{
     BasicProperties,
     callbacks::{DefaultChannelCallback, DefaultConnectionCallback},
     channel::{BasicPublishArguments, Channel, ConfirmSelectArguments},
-    connection::{Connection, OpenConnectionArguments},
+    connection::{self, Connection, OpenConnectionArguments},
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -16,6 +16,7 @@ use tracing::error;
 
 pub struct RabbitMQ {
     channel: Arc<Mutex<Channel>>,
+    _connection: connection,
 }
 
 impl RabbitMQ {
