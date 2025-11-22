@@ -6,7 +6,7 @@ use crate::domain::room::Message;
 pub type MessageProcessingResult<T> = Result<T, MessageProcessingError>;
 
 #[automock]
-pub trait MessageProcessing: Send + Sync {
+pub trait NotificationProcessing: Send + Sync {
     /// enqueues message for any kind of future processing or analitics
     async fn enqueue_message(&self, message: Message) -> MessageProcessingResult<()>;
 }
