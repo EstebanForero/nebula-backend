@@ -172,6 +172,14 @@ pub async fn obtain_room_members(
         .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
     Ok(users)
 }
+//
+//
+//
+//
+//
+//
+//
+//
 
 #[derive(Error, Debug)]
 pub enum RoomError {
