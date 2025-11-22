@@ -10,7 +10,7 @@ pub struct User {
     pub username: String,
     pub email: String,
 
-    #[serde(skip_serializing)] // never send password hash in API responses
+    #[serde(skip_serializing)]
     pub password_hash: String,
 
     pub created_at: DateTime<Utc>,
