@@ -232,10 +232,14 @@ impl RoomDatabase for PostgresDatabase {
         page: u32,
         page_size: u8,
     ) -> RoomDatabaseResult<Vec<Message>> {
+        let offset = ((page - 1) * page_size as u32) as i64;
+
         let messages = sqlx::query_as!(
             Message,
-            "SELECT * FROM messages WHERE room_id = $1 ORDER BY created_at DESC",
-            room_id
+            "SELECT * FROM messages WHERE room_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            room_id,
+            page_size as i64,
+            offset
         )
         .fetch_all(&self.pool)
         .await
