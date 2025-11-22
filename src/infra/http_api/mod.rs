@@ -62,15 +62,19 @@ pub async fn start_http_api(
     let (prom_layer, metric_handle) = PrometheusMetricLayer::pair();
 
     let mut app = Router::new()
-        .route("/health/auth", get(auth_health_check))
+        .route("/health", get(auth_health_check))
         .route("/rooms/public", get(get_all_public_rooms_end))
-        .route("/rooms", get(get_user_rooms_end))
-        .route("/room", post(create_room_end))
-        .route("/room/join", post(join_room_end))
-        .route("/message", post(send_message_end).get(get_messages))
+        .route("/rooms", get(get_user_rooms_end).post(create_room_end))
+        .route(
+            "/rooms/{room_id}/members",
+            get(get_room_members_end).post(join_room_end),
+        )
+        .route("/rooms/{room_id}/members/me", delete(leave_room_end))
+        .route(
+            "/rooms/{room_id}/messages",
+            get(get_messages).post(send_message_end),
+        )
         .route("/me", get(get_user_info_end))
-        .route("/room/members/{room_id}", get(get_room_members_end))
-        .route("/room/leave/{room_id}", delete(leave_room_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,
@@ -79,10 +83,10 @@ pub async fn start_http_api(
             "/metrics",
             get(move || async move { metric_handle.render() }),
         )
-        .route("/ws/room/{room_id}", get(ws_handler))
+        .route("/ws/rooms/{room_id}", get(ws_handler))
         .route("/", get(health_check))
-        .route("/register", post(register_end))
-        .route("/login", post(login_end))
+        .route("/auth/register", post(register_end))
+        .route("/auth/login", post(login_end))
         .layer(prom_layer)
         .with_state(auth_state);
 
