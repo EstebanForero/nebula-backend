@@ -70,8 +70,6 @@ pub async fn start_http_api(
             get(get_room_members_end).post(join_room_end),
         )
         .route("/rooms/{room_id}/members/me", delete(leave_room_end))
-        .route("/rooms/{room_id}/messages", get(get_messages))
-        .route("/rooms/messages", post(send_message_end))
         .route(
             "/rooms/{room_id}/messages",
             get(get_messages).post(send_message_end),

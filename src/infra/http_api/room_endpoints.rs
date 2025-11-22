@@ -39,7 +39,6 @@ pub struct Pagination {
 
 #[derive(Deserialize, Serialize)]
 pub struct MessageInfo {
-    room_id: Uuid,
     content: String,
 }
 
@@ -114,11 +113,12 @@ pub async fn get_all_public_rooms_end(
 pub async fn send_message_end(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
+    Path(room_id): Path<Uuid>,
     Json(message_info): Json<MessageInfo>,
 ) -> impl IntoResponse {
     match send_message(
         state.db,
-        message_info.room_id,
+        room_id,
         user_id,
         message_info.content,
         state.redis_publisher,
