@@ -21,6 +21,7 @@ mod use_cases;
 
 #[derive(Deserialize, Debug)]
 struct EnvVariables {
+    backend_addr: String,
     database_url: String,
     jwt_secret: String,
     redis_url: String,
@@ -63,9 +64,7 @@ async fn main() {
         .await,
     );
 
-    let addr = "0.0.0.0:3838".to_string();
-
-    info!("the addr is: {}", addr);
+    info!("the addr is: {}", env_vars.backend_addr);
 
     let rooms_channels1 = rooms_channels.clone();
     tokio::spawn(async move {
@@ -73,7 +72,7 @@ async fn main() {
     });
 
     start_http_api(
-        addr,
+        env_vars.backend_addr,
         env_vars.jwt_secret,
         postgres_database,
         rooms_channels.clone(),

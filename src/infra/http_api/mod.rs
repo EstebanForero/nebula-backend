@@ -71,14 +71,14 @@ pub async fn start_http_api(
         .route("/me", get(get_user_info_end))
         .route("/room/members/{room_id}", get(get_room_members_end))
         .route("/room/leave/{room_id}", delete(leave_room_end))
-        .route(
-            "/metrics",
-            get(move || async move { metric_handle.render() }),
-        )
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,
         ))
+        .route(
+            "/metrics",
+            get(move || async move { metric_handle.render() }),
+        )
         .route("/ws/room/{room_id}", get(ws_handler))
         .route("/", get(health_check))
         .route("/register", post(register_end))
