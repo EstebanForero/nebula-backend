@@ -68,7 +68,7 @@ pub async fn start_http_api(
         .route("/message", post(send_message_end).get(get_messages))
         .route("/me", get(get_user_info_end))
         .route("/room/members/{room_id}", get(get_room_members_end))
-        .route("/leave/{room_id}", delete(leave_room_end))
+        .route("/room/leave/{room_id}", delete(leave_room_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,
