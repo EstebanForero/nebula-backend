@@ -5,6 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
@@ -125,7 +126,10 @@ pub async fn send_message_end(
     .await
     {
         Ok(_) => (StatusCode::OK, "".to_string()),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+        Err(err) => {
+            error!("Error sending message: {err}");
+            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+        }
     }
 }
 
@@ -142,7 +146,10 @@ pub async fn get_messages(
     .await
     {
         Ok(messages) => Ok((StatusCode::OK, Json(messages))),
-        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+        Err(err) => {
+            error!("Error getting messages: {err}");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+        }
     }
 }
 
