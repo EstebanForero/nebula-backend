@@ -213,7 +213,7 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Per-Endpoint Detail: p95, AVG & RPS",
+      "title": "Per-Endpoint: $endpoint (p95, AVG & RPS)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus-ds"
@@ -241,20 +241,21 @@
         {
           "refId": "A",
           "expr": "histogram_quantile(0.95, sum by (le) (rate(axum_http_requests_duration_seconds_bucket{endpoint=~\"$endpoint\"}[5m])))",
-          "legendFormat": "p95"
+          "legendFormat": "p95 $endpoint"
         },
         {
           "refId": "B",
           "expr": "sum(rate(axum_http_requests_duration_seconds_sum{endpoint=~\"$endpoint\"}[5m])) / sum(rate(axum_http_requests_duration_seconds_count{endpoint=~\"$endpoint\"}[5m]))",
-          "legendFormat": "avg"
+          "legendFormat": "avg $endpoint"
         },
         {
           "refId": "C",
           "expr": "sum by (method) (rate(axum_http_requests_total{endpoint=~\"$endpoint\"}[1m]))",
-          "legendFormat": "RPS {{method}}"
+          "legendFormat": "RPS {{method}} $endpoint"
         }
       ]
     }
+
   ],
   "templating": {
     "list": [
