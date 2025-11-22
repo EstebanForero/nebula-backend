@@ -37,7 +37,7 @@ pub struct AppState {
     pub jwt_secret: String,
     pub rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
     redis_publisher: Arc<RedisPublisher>,
-    message_processing: Arc<RabbitMQ>,
+    rabbit_mq: Arc<RabbitMQ>,
 }
 
 pub async fn start_http_api(
@@ -54,7 +54,7 @@ pub async fn start_http_api(
         jwt_secret,
         rooms_channels,
         redis_publisher,
-        message_processing,
+        rabbit_mq: message_processing,
     };
 
     let cors_layer = CorsLayer::very_permissive();
