@@ -6,7 +6,6 @@ use axum::{
     response::Response,
 };
 use jsonwebtoken::{DecodingKey, Validation, decode};
-use tracing::info;
 use uuid::Uuid;
 
 use crate::{infra::http_api::AppState, use_cases::auth_service::Claims};
@@ -35,8 +34,6 @@ pub async fn middleware_fn(
             .unwrap();
     };
 
-    info!("Bearer token before strip: {bearer_token}");
-
     let jwt_token = match bearer_token.strip_prefix("Bearer ") {
         Some(token) => token.trim().to_string(),
         None => {
@@ -47,14 +44,10 @@ pub async fn middleware_fn(
         }
     };
 
-    info!("Token after strip: {jwt_token}");
-
-    let mut user_id: Uuid;
-
-    match extract_user_id_from_jwt(jwt_token, &state.jwt_secret) {
-        Ok(id) => user_id = id,
+    let user_id = match extract_user_id_from_jwt(jwt_token, &state.jwt_secret) {
+        Ok(id) => id,
         Err(res) => return res,
-    }
+    };
 
     request.extensions_mut().insert(user_id);
 
@@ -68,7 +61,7 @@ pub fn extract_user_id_from_jwt(jwt_token: String, jwt_secret: &str) -> Result<U
         &Validation::default(),
     ) {
         Ok(clamis) => clamis.claims,
-        Err(err) => {
+        Err(_err) => {
             return Err(Response::builder()
                 .status(401)
                 .body("invalid jwt format or expired".into())
