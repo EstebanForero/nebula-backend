@@ -145,6 +145,20 @@ pub async fn send_message(
     Ok(())
 }
 
+pub async fn obtain_messages(
+    db: Arc<impl RoomDatabase>,
+    page: u32,
+    page_size: u8,
+    room_id: Uuid,
+) -> RoomResult<Vec<Message>> {
+    let messages = db
+        .get_room_messages(room_id, page, page_size)
+        .await
+        .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
+
+    Ok(messages)
+}
+
 #[derive(Error, Debug)]
 pub enum RoomError {
     #[error("database Error")]

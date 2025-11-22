@@ -1,6 +1,6 @@
 use axum::{
     Extension,
-    extract::{Json, Path, State, rejection::JsonRejection},
+    extract::{Json, Path, Query, State, rejection::JsonRejection},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -11,8 +11,8 @@ use crate::{
     domain::room::RoomVisibility,
     infra::http_api::AppState,
     use_cases::room_service::{
-        create_room, get_all_public_rooms, get_user_rooms_use, join_room, send_message,
-        user_is_in_room,
+        create_room, get_all_public_rooms, get_user_rooms_use, join_room, obtain_messages,
+        send_message, user_is_in_room,
     },
 };
 
@@ -21,6 +21,13 @@ pub struct RoomInfo {
     password: Option<String>,
     name: String,
     visibility: RoomVisibility,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Pegination {
+    page: u32,
+    page_size: u8,
+    room_id: Uuid,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -95,5 +102,22 @@ pub async fn send_message_end(
     {
         Ok(_) => (StatusCode::OK, "".to_string()),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+pub async fn get_messages(
+    State(state): State<AppState>,
+    pegination: Query<Pegination>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    match obtain_messages(
+        state.db,
+        pegination.page,
+        pegination.page_size,
+        pegination.room_id,
+    )
+    .await
+    {
+        Ok(messages) => Ok((StatusCode::OK, Json(messages))),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
     }
 }
