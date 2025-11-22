@@ -7,8 +7,8 @@ use crate::{
 use amqprs::{
     BasicProperties,
     callbacks::{DefaultChannelCallback, DefaultConnectionCallback},
-    channel::{BasicPublishArguments, Channel, ConfirmSelectArguments},
-    connection::{self, Connection, OpenConnectionArguments},
+    channel::{BasicPublishArguments, Channel, ConfirmSelectArguments, QueueDeclareArguments},
+    connection::{Connection, OpenConnectionArguments},
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -44,7 +44,6 @@ impl RabbitMQ {
     ) -> Result<RabbitMQ, ()> {
         let mut args = OpenConnectionArguments::new(host, port, username, password);
         args.virtual_host(vhost).heartbeat(60);
-
         let connection = Connection::open(&args)
             .await
             .map_err(|err| error!("Error connecting rabbit mq: {err}"))?;
@@ -52,13 +51,22 @@ impl RabbitMQ {
             .register_callback(DefaultConnectionCallback)
             .await
             .ok();
-
         let channel = connection.open_channel(None).await.map_err(|_| ())?;
         channel.register_callback(DefaultChannelCallback).await.ok();
 
+        let queue_args = QueueDeclareArguments::durable_client_named("chat_messages")
+            .durable(true)
+            .auto_delete(false)
+            .finish();
         let _ = channel
+            .queue_declare(queue_args)
+            .await
+            .map_err(|e| error!("Failed to declare queue: {e}"))?;
+
+        channel
             .confirm_select(ConfirmSelectArguments::default())
-            .await;
+            .await
+            .map_err(|e| error!("Failed to enable confirms: {e}"))?;
 
         Ok(RabbitMQ {
             channel: Arc::new(Mutex::new(channel)),
@@ -71,16 +79,14 @@ impl MessageProcessing for RabbitMQ {
     async fn enqueue_message(&self, message: Message) -> MessageProcessingResult<()> {
         let payload = serde_json::to_vec(&message)
             .map_err(|e| MessageProcessingError::MessageProcessingError(e.to_string()))?;
-
         let publish_args = BasicPublishArguments::new("", "chat_messages");
-
         let properties = BasicProperties::default().with_delivery_mode(2).finish();
-
         self.channel
             .lock()
             .await
             .basic_publish(properties, payload, publish_args)
             .await
-            .map_err(|e| MessageProcessingError::MessageProcessingError(e.to_string()))
+            .map_err(|e| MessageProcessingError::MessageProcessingError(e.to_string()))?;
+        Ok(())
     }
 }
