@@ -1,4 +1,3 @@
-# docker-compose.yml
 version: "3.9"
 
 services:
@@ -11,7 +10,7 @@ services:
       POSTGRES_USER: nebula
       POSTGRES_PASSWORD: nebula123  # Change in prod!
     ports:
-      - "5432:5432"                 # Expose for local tools like pgAdmin
+      - "5432:5432"                 # Expose for local tools like psql / pgAdmin
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,7 +46,7 @@ services:
       RABBITMQ_DEFAULT_VHOST: nebula
     ports:
       - "5672:5672"                 # AMQP protocol
-      - "15672:15672"               # Management UI (http://localhost:15672)
+      - "15672:15672"               # Management UI → http://localhost:15672
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -57,12 +56,68 @@ services:
       retries: 5
       start_period: 30s
 
+  backend:
+    build: .
+    image: nebula-backend:latest        # local image name for reuse if you want
+    container_name: nebula-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    env_file:
+      - .env                            # your existing backend envs
+    environment:
+      # Override connection URLs to use internal Docker hostnames
+      DATABASE_URL: postgres://nebula:nebula123@postgres:5432/nebula
+      REDIS_URL: redis://redis:6379
+      RABBIT_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
+      # If you have JWT_SECRET / other secrets in .env they’ll still be loaded
+    ports:
+      - "3838:3838"                     # Backend HTTP API → http://localhost:3838
+
+  notification-service:
+    image: esteban1930/nebula-notification-service:latest
+    container_name: nebula-notification-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - rabbitmq
+    env_file:
+      - .env
+    environment:
+      # Override core infra URLs to point to Docker services
+      DATABASE_URL: postgres://nebula:nebula123@postgres:5432/nebula
+      RABBIT_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
+      # JWT_SECRET and VAPID keys can come from .env
+      JWT_SECRET: ${JWT_SECRET:-changeme}
+      WEBPUSH_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY:-changeme}
+      WEBPUSH_VAPID_PRIVATE_KEY: ${WEBPUSH_VAPID_PRIVATE_KEY:-changeme}
+    ports:
+      - "3010:3010"                     # Notification HTTP API → http://localhost:3010
+
+  frontend:
+    image: esteban1930/nebula-frontend:latest
+    container_name: nebula-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - notification-service
+    ports:
+      - "8080:80"                       # Frontend → http://localhost:8080
+    environment:
+      # These are used by Vite at build/runtime in the container
+      # From the BROWSER’s POV, it talks to localhost:3838 / 3010
+      VITE_API_BASE_URL: http://localhost:3838
+      VITE_NOTIFICATION_BASE_URL: http://localhost:3010
+      VITE_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY:-changeme}
+
   prometheus:
     image: prom/prometheus:latest
     container_name: nebula-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "9090:9090"                     # Prometheus UI → http://localhost:9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
@@ -70,6 +125,8 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=7d"
       - "--web.enable-lifecycle"
+    # if backend is now in this compose, in prometheus.yml change the target to backend:3838
+    # extra_hosts no longer strictly needed, but harmless
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -78,19 +135,18 @@ services:
     container_name: nebula-grafana
     restart: unless-stopped
     ports:
-      - "3050:3000"  # Grafana UI → http://localhost:3000
+      - "3050:3000"                     # Grafana UI → http://localhost:3050
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin   # change in real env
       GF_SERVER_DOMAIN: localhost
-      GF_SERVER_ROOT_URL: http://localhost:3000/
+      GF_SERVER_ROOT_URL: http://localhost:3050/
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
-
 
 volumes:
   postgres_data:

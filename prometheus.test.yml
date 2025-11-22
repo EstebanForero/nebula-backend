@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  # Scrape the Rust backend on the host at :3838/metrics
+  - job_name: "nebula-backend"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:3838"]
+        labels:
+          app: "nebula-rust-backend"
+

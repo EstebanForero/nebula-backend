@@ -5,7 +5,7 @@
   "tags": ["nebula", "backend", "axum"],
   "timezone": "",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "editable": true,
   "graphTooltip": 0,
@@ -21,12 +21,45 @@
     {
       "id": 1,
       "type": "timeseries",
+      "title": "Global p95 Latency (all endpoints)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(axum_http_requests_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 latency"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
       "title": "p95 Latency per Endpoint",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus-ds"
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -52,14 +85,14 @@
       ]
     },
     {
-      "id": 2,
+      "id": 3,
       "type": "timeseries",
       "title": "Requests per Second (RPS) per Endpoint",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus-ds"
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "fieldConfig": {
         "defaults": {
           "unit": "req/s",
@@ -85,14 +118,14 @@
       ]
     },
     {
-      "id": 3,
+      "id": 4,
       "type": "timeseries",
       "title": "Error Rate (5xx as % of all requests)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus-ds"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "gridPos": { "h": 8, "w": 8, "x": 12, "y": 8 },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
@@ -120,14 +153,14 @@
       ]
     },
     {
-      "id": 4,
+      "id": 5,
       "type": "stat",
       "title": "Total In-flight Requests",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus-ds"
       },
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 9 },
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 8 },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -150,14 +183,14 @@
       ]
     },
     {
-      "id": 5,
+      "id": 6,
       "type": "bargauge",
       "title": "Status Code Breakdown (rate over 5m)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus-ds"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "fieldConfig": {
         "defaults": {
           "unit": "req/s",
@@ -176,10 +209,79 @@
           "legendFormat": "{{status}}"
         }
       ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Per-Endpoint Detail: p95 & RPS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 24 },
+      "repeat": "endpoint_filter",
+      "repeatDirection": "h",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(axum_http_requests_duration_seconds_bucket{endpoint=\"$endpoint_filter\"}[5m])))",
+          "legendFormat": "p95 latency"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (method) (rate(axum_http_requests_total{endpoint=\"$endpoint_filter\"}[1m]))",
+          "legendFormat": "RPS {{method}}"
+        }
+      ]
     }
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "endpoint_filter",
+        "label": "Endpoint",
+        "type": "custom",
+        "hide": 0,
+        "query": "/health/auth,/rooms/public,/rooms,/room,/room/join,/message,/me,/room/members/{room_id},/room/leave/{room_id},/ws/room/{room_id},/,/register,/login",
+        "current": {
+          "text": "/health/auth",
+          "value": "/health/auth"
+        },
+        "options": [
+          { "text": "/health/auth", "value": "/health/auth", "selected": true },
+          { "text": "/rooms/public", "value": "/rooms/public", "selected": false },
+          { "text": "/rooms", "value": "/rooms", "selected": false },
+          { "text": "/room", "value": "/room", "selected": false },
+          { "text": "/room/join", "value": "/room/join", "selected": false },
+          { "text": "/message", "value": "/message", "selected": false },
+          { "text": "/me", "value": "/me", "selected": false },
+          { "text": "/room/members/{room_id}", "value": "/room/members/{room_id}", "selected": false },
+          { "text": "/room/leave/{room_id}", "value": "/room/leave/{room_id}", "selected": false },
+          { "text": "/ws/room/{room_id}", "value": "/ws/room/{room_id}", "selected": false },
+          { "text": "/", "value": "/", "selected": false },
+          { "text": "/register", "value": "/register", "selected": false },
+          { "text": "/login", "value": "/login", "selected": false }
+        ],
+        "multi": true,
+        "includeAll": false
+      }
+    ]
   },
   "annotations": {
     "list": [
