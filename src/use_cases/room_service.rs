@@ -7,7 +7,10 @@ use uuid::Uuid;
 
 use crate::{
     domain::room::{MemberRole, Message, Room, RoomMember, RoomVisibility},
-    use_cases::{realtime_broker::MessagePublisher, room_database::RoomDatabase},
+    use_cases::{
+        message_processing::MessageProcessing, realtime_broker::MessagePublisher,
+        room_database::RoomDatabase,
+    },
 };
 
 type RoomResult<T> = Result<T, RoomError>;
@@ -115,6 +118,7 @@ pub async fn send_message(
     user_id: Uuid,
     content: String,
     message_publisher: Arc<impl MessagePublisher>,
+    message_procceser: Arc<impl MessageProcessing>,
 ) -> RoomResult<()> {
     let message = Message {
         id: Uuid::new_v4(),
@@ -129,9 +133,14 @@ pub async fn send_message(
         .map_err(|err| RoomError::DatabaseError(err.to_string()))?;
 
     message_publisher
-        .broadcast_message(message)
+        .broadcast_message(message.clone())
         .await
         .map_err(|err| RoomError::BroadcastError(err.to_string()))?;
+
+    message_procceser
+        .enqueue_message(message)
+        .await
+        .map_err(|err| RoomError::EnqueueMessageError(err.to_string()))?;
 
     Ok(())
 }
@@ -146,4 +155,6 @@ pub enum RoomError {
     PasswordNotGiven,
     #[error("broadcast error")]
     BroadcastError(String),
+    #[error("enqueue message error")]
+    EnqueueMessageError(String),
 }

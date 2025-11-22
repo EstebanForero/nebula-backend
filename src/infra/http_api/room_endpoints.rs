@@ -89,6 +89,7 @@ pub async fn send_message_end(
         user_id,
         message_info.content,
         state.redis_publisher,
+        state.message_processing,
     )
     .await
     {
