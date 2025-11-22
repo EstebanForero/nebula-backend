@@ -5,6 +5,7 @@ use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{domain::user::User, use_cases::user_database::UserDatabase};
@@ -27,7 +28,10 @@ pub async fn login(
         Ok(user) => user,
         Err(_) => match database.get_user_by_email(identificator.clone()).await {
             Ok(user) => user,
-            Err(err) => return Err(AuthError::DatabaseError(err.to_string())),
+            Err(err) => {
+                error!("err: {err}");
+                return Err(AuthError::InvalidCredentials);
+            }
         },
     };
 
