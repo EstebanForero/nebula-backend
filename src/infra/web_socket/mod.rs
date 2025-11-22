@@ -1,21 +1,35 @@
 use axum::{
-    Extension,
-    extract::{Path, State, WebSocketUpgrade},
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    extract::{Path, Query, State, WebSocketUpgrade},
+    response::Response,
 };
+use serde::Deserialize;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::{infra::http_api::AppState, use_cases::room_service::user_is_in_room};
+use crate::{
+    infra::http_api::{AppState, middleware_auth::extract_user_id_from_jwt},
+    use_cases::room_service::user_is_in_room,
+};
+
+#[derive(Deserialize)]
+pub struct WsAuth {
+    pub token: String,
+}
 
 pub async fn ws_handler(
     Path(room_id): Path<Uuid>,
     ws: WebSocketUpgrade,
+    Query(WsAuth { token }): Query<WsAuth>,
     State(state): State<AppState>,
-    Extension(user_id): Extension<Uuid>,
 ) -> Response {
+    let user_id;
+
+    match extract_user_id_from_jwt(token, &state.jwt_secret) {
+        Ok(id) => user_id = id,
+        Err(res) => return res,
+    };
+
     info!("User with id: {user_id} joining room: {}", room_id);
 
     let is_in_room = match user_is_in_room(state.db.clone(), user_id, room_id).await {

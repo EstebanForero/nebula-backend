@@ -49,31 +49,42 @@ pub async fn middleware_fn(
 
     info!("Token after strip: {jwt_token}");
 
+    let mut user_id: Uuid;
+
+    match extract_user_id_from_jwt(jwt_token, &state.jwt_secret) {
+        Ok(id) => user_id = id,
+        Err(res) => return res,
+    }
+
+    request.extensions_mut().insert(user_id);
+
+    next.run(request).await
+}
+
+pub fn extract_user_id_from_jwt(jwt_token: String, jwt_secret: &str) -> Result<Uuid, Response> {
     let my_claims: Claims = match decode(
         jwt_token,
-        &DecodingKey::from_secret(state.jwt_secret.as_ref()),
+        &DecodingKey::from_secret(jwt_secret.as_ref()),
         &Validation::default(),
     ) {
         Ok(clamis) => clamis.claims,
         Err(err) => {
-            return Response::builder()
+            return Err(Response::builder()
                 .status(401)
                 .body("invalid jwt format or expired".into())
-                .unwrap();
+                .unwrap());
         }
     };
 
     let user_id = match Uuid::from_str(&my_claims.sub) {
         Ok(uuid_real) => uuid_real,
         Err(_) => {
-            return Response::builder()
+            return Err(Response::builder()
                 .status(401)
                 .body("wrong user id format".into())
-                .unwrap();
+                .unwrap());
         }
     };
 
-    request.extensions_mut().insert(user_id);
-
-    next.run(request).await
+    Ok(user_id)
 }

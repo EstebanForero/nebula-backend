@@ -1,4 +1,4 @@
-mod middleware_auth;
+pub mod middleware_auth;
 pub mod room_endpoints;
 pub mod user_endpoints;
 use std::sync::Arc;
@@ -34,7 +34,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<PostgresDatabase>,
-    jwt_secret: String,
+    pub jwt_secret: String,
     pub rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
     redis_publisher: Arc<RedisPublisher>,
     message_processing: Arc<RabbitMQ>,
@@ -61,7 +61,6 @@ pub async fn start_http_api(
 
     let mut app = Router::new()
         .route("/health/auth", get(auth_health_check))
-        .route("/ws/room/{room_id}", get(ws_handler))
         .route("/rooms/public", get(get_all_public_rooms_end))
         .route("/rooms", get(get_user_rooms_end))
         .route("/room", post(create_room_end))
@@ -71,6 +70,7 @@ pub async fn start_http_api(
             auth_state.clone(),
             middleware_auth::middleware_fn,
         ))
+        .route("/ws/room/{room_id}", get(ws_handler))
         .route("/", get(health_check))
         .route("/register", post(register_end))
         .route("/login", post(login_end))
