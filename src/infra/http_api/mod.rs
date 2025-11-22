@@ -55,7 +55,7 @@ pub async fn start_http_api(
         .route("/rooms", get(get_all_public_rooms_end))
         .route("/rooms/{room_id}", get(get_user_rooms_end))
         .route("/room", post(create_room_end))
-        .route("/room", post(join_room_end))
+        .route("/room/join", post(join_room_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,
