@@ -155,6 +155,6 @@ pub enum RoomError {
     PasswordNotGiven,
     #[error("broadcast error")]
     BroadcastError(String),
-    #[error("enqueue message error")]
+    #[error("enqueue message error: {0}")]
     EnqueueMessageError(String),
 }
