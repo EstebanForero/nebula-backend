@@ -9,6 +9,7 @@ use axum::{
 };
 use dashmap::DashMap;
 use tokio::sync::broadcast;
+use tower_http::cors::CorsLayer;
 use tracing::info;
 use uuid::Uuid;
 
@@ -18,8 +19,8 @@ use crate::{
         database::PostgresDatabase,
         http_api::{
             room_endpoints::{
-                create_room_end, get_all_public_rooms_end, get_user_rooms_end, join_room_end,
-                send_message_end,
+                create_room_end, get_all_public_rooms_end, get_messages, get_user_rooms_end,
+                join_room_end, send_message_end,
             },
             user_endpoints::{login_end, register_end},
         },
@@ -46,6 +47,7 @@ pub async fn start_http_api(
     rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
     redis_publisher: Arc<RedisPublisher>,
     message_processing: Arc<RabbitMQ>,
+    dev_mode: bool,
 ) {
     let auth_state = AppState {
         db,
@@ -55,14 +57,16 @@ pub async fn start_http_api(
         message_processing,
     };
 
-    let app = Router::new()
+    let cors_layer = CorsLayer::very_permissive();
+
+    let mut app = Router::new()
         .route("/health/auth", get(auth_health_check))
         .route("/ws/room/{room_id}", get(ws_handler))
         .route("/rooms/public", get(get_all_public_rooms_end))
         .route("/rooms", get(get_user_rooms_end))
         .route("/room", post(create_room_end))
         .route("/room/join/{room_id}", post(join_room_end))
-        .route("/message", post(send_message_end))
+        .route("/message", post(send_message_end).get(get_messages))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,
@@ -71,6 +75,10 @@ pub async fn start_http_api(
         .route("/register", post(register_end))
         .route("/login", post(login_end))
         .with_state(auth_state);
+
+    if dev_mode {
+        app = app.layer(cors_layer)
+    }
 
     let listener = tokio::net::TcpListener::bind(addr.clone()).await.unwrap();
     info!("Starting server in: {addr}");

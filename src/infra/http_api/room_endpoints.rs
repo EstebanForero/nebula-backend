@@ -24,7 +24,7 @@ pub struct RoomInfo {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct Pegination {
+pub struct Pagination {
     page: u32,
     page_size: u8,
     room_id: Uuid,
@@ -107,7 +107,7 @@ pub async fn send_message_end(
 
 pub async fn get_messages(
     State(state): State<AppState>,
-    pegination: Query<Pegination>,
+    pegination: Query<Pagination>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     match obtain_messages(
         state.db,

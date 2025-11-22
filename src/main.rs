@@ -29,6 +29,7 @@ struct EnvVariables {
     rabbitmq_username: String,
     rabbitmq_password: String,
     rabbitmq_vhost: String,
+    dev_mode: bool,
 }
 
 #[tokio::main(flavor = "multi_thread")]
