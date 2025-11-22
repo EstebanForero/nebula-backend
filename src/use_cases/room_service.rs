@@ -260,11 +260,18 @@ mod test {
     use uuid::Uuid;
 
     use crate::{
-        domain::room::{Room, RoomVisibility},
+        domain::{
+            room::{Message, Room, RoomVisibility},
+            user::User,
+        },
         use_cases::{
-            notification_service::MockNotificationService,
-            room_database::MockRoomDatabase,
-            room_service::{RoomError, join_room, user_is_in_room},
+            notification_service::{MockNotificationService, NotificationServiceError},
+            realtime_broker::MockMessagePublisher,
+            room_database::{MockRoomDatabase, RoomDatabaseError},
+            room_service::{
+                RoomError, create_room, get_all_public_rooms, get_user_rooms_use, join_room,
+                leave_room, obtain_messages, obtain_room_members, send_message, user_is_in_room,
+            },
         },
     };
 
@@ -393,5 +400,290 @@ mod test {
         .await;
 
         assert!(matches!(res, Err(RoomError::InvalidRoomPassword)));
+    }
+
+    #[tokio::test]
+    async fn join_private_room_correct_password_ok() {
+        let mut db = MockRoomDatabase::new();
+        let mut notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+        let hash = bcrypt::hash("mypassword", bcrypt::DEFAULT_COST).unwrap();
+
+        db.expect_get_room().returning(move |_| {
+            Ok(Room {
+                id: room_id,
+                name: "Private".into(),
+                visibility: RoomVisibility::Private,
+                password_hash: Some(hash.clone()),
+                created_by: user_id,
+                created_at: Utc::now(),
+            })
+        });
+
+        db.expect_create_room_membership().returning(|_| Ok(()));
+
+        notif
+            .expect_send_room_member_notification()
+            .returning(|_| Ok(()));
+
+        let res = join_room(
+            Arc::new(db),
+            room_id,
+            user_id,
+            Some("mypassword".into()),
+            Arc::new(notif),
+        )
+        .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn leave_room_ok() {
+        let mut db = MockRoomDatabase::new();
+        let mut notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        db.expect_delete_room_membership().returning(|_, _| Ok(()));
+
+        notif
+            .expect_send_room_member_notification()
+            .returning(|_| Ok(()));
+
+        let res = leave_room(Arc::new(db), Arc::new(notif), room_id, user_id).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn leave_room_delete_fails() {
+        let mut db = MockRoomDatabase::new();
+        let notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        db.expect_delete_room_membership()
+            .returning(|_, _| Err(RoomDatabaseError::InternalDBError("db error".into())));
+
+        let res = leave_room(Arc::new(db), Arc::new(notif), room_id, user_id).await;
+
+        assert!(matches!(res, Err(RoomError::DatabaseError(_))));
+    }
+
+    #[tokio::test]
+    async fn leave_room_notification_fails() {
+        let mut db = MockRoomDatabase::new();
+        let mut notif = MockNotificationService::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        db.expect_delete_room_membership().returning(|_, _| Ok(()));
+
+        notif.expect_send_room_member_notification().returning(|_| {
+            Err(NotificationServiceError::MessageProcessingError(
+                "notif error".into(),
+            ))
+        });
+
+        let res = leave_room(Arc::new(db), Arc::new(notif), room_id, user_id).await;
+
+        assert!(matches!(res, Err(RoomError::NotificationError(_))));
+    }
+
+    #[tokio::test]
+    async fn test_create_room_private_with_password() {
+        let mut db = MockRoomDatabase::new();
+        let user_id = Uuid::new_v4();
+
+        db.expect_create_room().returning(|_| Ok(()));
+
+        db.expect_create_room_membership().returning(|_| Ok(()));
+
+        let res = create_room(
+            Arc::new(db),
+            RoomVisibility::Private,
+            Some("1234".into()),
+            "My Room".into(),
+            user_id,
+        )
+        .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_room_private_missing_password() {
+        let db = MockRoomDatabase::new();
+
+        let user_id = Uuid::new_v4();
+
+        let res = create_room(
+            Arc::new(db),
+            RoomVisibility::Private,
+            None,
+            "My Room".into(),
+            user_id,
+        )
+        .await;
+
+        assert!(matches!(res, Err(RoomError::PasswordNotGiven)));
+    }
+
+    #[tokio::test]
+    async fn test_get_user_rooms() {
+        let mut db = MockRoomDatabase::new();
+        let user_id = Uuid::new_v4();
+
+        db.expect_get_user_rooms().returning(move |_| {
+            Ok(vec![Room {
+                id: Uuid::new_v4(),
+                name: "Test".into(),
+                visibility: RoomVisibility::Public,
+                password_hash: None,
+                created_by: user_id.clone(),
+                created_at: Utc::now(),
+            }])
+        });
+
+        let res = get_user_rooms_use(Arc::new(db), user_id.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_all_public_rooms() {
+        let mut db = MockRoomDatabase::new();
+
+        db.expect_get_public_rooms().returning(|| {
+            Ok(vec![Room {
+                id: Uuid::new_v4(),
+                name: "Public Room".into(),
+                visibility: RoomVisibility::Public,
+                password_hash: None,
+                created_by: Uuid::new_v4(),
+                created_at: Utc::now(),
+            }])
+        });
+
+        let rooms = get_all_public_rooms(Arc::new(db)).await.unwrap();
+
+        assert_eq!(rooms.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_obtain_messages() {
+        let mut db = MockRoomDatabase::new();
+        let room_id = Uuid::new_v4();
+
+        db.expect_get_room_messages().returning(move |_, _, _| {
+            Ok(vec![Message {
+                id: Uuid::new_v4(),
+                room_id: room_id.clone(),
+                sender_id: Uuid::new_v4(),
+                content: "msg".into(),
+                created_at: Utc::now(),
+            }])
+        });
+
+        let msgs = obtain_messages(Arc::new(db), 1, 10, room_id).await.unwrap();
+
+        assert_eq!(msgs.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_obtain_room_members() {
+        let mut db = MockRoomDatabase::new();
+        let room_id = Uuid::new_v4();
+
+        db.expect_get_room_members().returning(|_| {
+            Ok(vec![User {
+                id: Uuid::new_v4(),
+                username: "john".into(),
+                email: "john@example.com".into(),
+                password_hash: "hash".into(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }])
+        });
+
+        let members = obtain_room_members(Arc::new(db), room_id).await.unwrap();
+
+        assert_eq!(members.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_send_message_success() {
+        let mut db = MockRoomDatabase::new();
+        let mut publisher = MockMessagePublisher::new();
+
+        let room_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+        let content = "Hello World!".to_string();
+
+        // Expect DB create_message to succeed
+        db.expect_create_message().returning(|_| Ok(()));
+
+        // Expect publisher broadcast_message to succeed
+        publisher.expect_broadcast_message().returning(|_| Ok(()));
+
+        let result =
+            send_message(Arc::new(db), room_id, user_id, content, Arc::new(publisher)).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_send_message_db_fail() {
+        let mut db = MockRoomDatabase::new();
+        let publisher = MockMessagePublisher::new();
+
+        db.expect_create_message()
+            .returning(|_| Err(RoomDatabaseError::InternalDBError("db error".into())));
+
+        let result = send_message(
+            Arc::new(db),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "hi".into(),
+            Arc::new(publisher),
+        )
+        .await;
+
+        assert!(matches!(result, Err(RoomError::DatabaseError(_))));
+    }
+
+    #[tokio::test]
+    async fn test_send_message_broadcast_fail() {
+        let mut db = MockRoomDatabase::new();
+        let mut publisher = MockMessagePublisher::new();
+
+        db.expect_create_message().returning(|_| Ok(()));
+
+        publisher.expect_broadcast_message().returning(|_| {
+            Err(
+                crate::use_cases::realtime_broker::RealTimeBrokerError::InternalBrokerError(
+                    "broadcast err".into(),
+                ),
+            )
+        });
+
+        let result = send_message(
+            Arc::new(db),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "hello".into(),
+            Arc::new(publisher),
+        )
+        .await;
+
+        assert!(matches!(result, Err(RoomError::BroadcastError(_))));
     }
 }
