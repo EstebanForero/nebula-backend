@@ -7,6 +7,7 @@ use axum::{
     Extension, Router, middleware,
     routing::{delete, get, post},
 };
+use axum_prometheus::PrometheusMetricLayer;
 use dashmap::DashMap;
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
@@ -58,6 +59,8 @@ pub async fn start_http_api(
 
     let cors_layer = CorsLayer::very_permissive();
 
+    let (prom_layer, metric_handle) = PrometheusMetricLayer::pair();
+
     let mut app = Router::new()
         .route("/health/auth", get(auth_health_check))
         .route("/rooms/public", get(get_all_public_rooms_end))
@@ -68,6 +71,10 @@ pub async fn start_http_api(
         .route("/me", get(get_user_info_end))
         .route("/room/members/{room_id}", get(get_room_members_end))
         .route("/room/leave/{room_id}", delete(leave_room_end))
+        .route(
+            "/metrics",
+            get(move || async move { metric_handle.render() }),
+        )
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,
@@ -76,6 +83,7 @@ pub async fn start_http_api(
         .route("/", get(health_check))
         .route("/register", post(register_end))
         .route("/login", post(login_end))
+        .layer(prom_layer)
         .with_state(auth_state);
 
     if dev_mode {

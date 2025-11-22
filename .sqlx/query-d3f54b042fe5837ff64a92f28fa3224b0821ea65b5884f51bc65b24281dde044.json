@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM users WHERE id IN (SELECT user_id FROM room_members WHERE room_id = $1)",
+  "query": "SELECT id, username, email, created_at, updated_at, password_hash FROM users WHERE username = $1",
   "describe": {
     "columns": [
       {
@@ -20,38 +20,23 @@
       },
       {
         "ordinal": 3,
-        "name": "password_hash",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
-        "name": "webpush_endpoint",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 7,
-        "name": "webpush_p256dh",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 8,
-        "name": "webpush_auth",
+        "ordinal": 5,
+        "name": "password_hash",
         "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text"
       ]
     },
     "nullable": [
@@ -60,11 +45,8 @@
       false,
       false,
       false,
-      false,
-      true,
-      true,
-      true
+      false
     ]
   },
-  "hash": "4fe929bd8711ccbf32ded6505071074a309dc2953776fa12867be5a48fb02b35"
+  "hash": "d3f54b042fe5837ff64a92f28fa3224b0821ea65b5884f51bc65b24281dde044"
 }
