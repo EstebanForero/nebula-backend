@@ -27,14 +27,12 @@ pub struct RoomInfo {
 #[derive(Deserialize, Serialize)]
 pub struct JoinRoomInfo {
     password: Option<String>,
-    room_id: Uuid,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Pagination {
     page: u32,
     page_size: u8,
-    room_id: Uuid,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -64,11 +62,12 @@ pub async fn create_room_end(
 pub async fn join_room_end(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
+    Path(room_id): Path<Uuid>,
     Json(join_room_info): Json<JoinRoomInfo>,
 ) -> impl IntoResponse {
     match join_room(
         state.db,
-        join_room_info.room_id,
+        room_id,
         user_id,
         join_room_info.password,
         state.rabbit_mq,
@@ -135,16 +134,10 @@ pub async fn send_message_end(
 
 pub async fn get_messages(
     State(state): State<AppState>,
+    Path(room_id): Path<Uuid>,
     pegination: Query<Pagination>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    match obtain_messages(
-        state.db,
-        pegination.page,
-        pegination.page_size,
-        pegination.room_id,
-    )
-    .await
-    {
+    match obtain_messages(state.db, pegination.page, pegination.page_size, room_id).await {
         Ok(messages) => Ok((StatusCode::OK, Json(messages))),
         Err(err) => {
             error!("Error getting messages: {err}");
