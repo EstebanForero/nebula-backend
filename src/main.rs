@@ -49,13 +49,15 @@ async fn main() {
 
     let rooms_channels = Arc::new(DashMap::new());
 
-    let rabbit_mq = RabbitMQ::new(
-        &env_vars.rabbitmq_host,
-        env_vars.rabbitmq_port,
-        &env_vars.rabbitmq_username,
-        &env_vars.rabbitmq_password,
-    )
-    .await;
+    let rabbit_mq = Arc::new(
+        RabbitMQ::new(
+            &env_vars.rabbitmq_host,
+            env_vars.rabbitmq_port,
+            &env_vars.rabbitmq_username,
+            &env_vars.rabbitmq_password,
+        )
+        .await,
+    );
 
     let addr = "0.0.0.0:3838".to_string();
 
@@ -72,6 +74,7 @@ async fn main() {
         postgres_database,
         rooms_channels.clone(),
         message_publisher,
+        rabbit_mq,
     )
     .await;
 }

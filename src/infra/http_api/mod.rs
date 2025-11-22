@@ -21,6 +21,7 @@ use crate::{
             },
             user_endpoints::{login_end, register_end},
         },
+        rabbit_mq::RabbitMQ,
         redis::RedisPublisher,
         web_socket::ws_handler,
     },
@@ -33,6 +34,7 @@ pub struct AppState {
     jwt_secret: String,
     pub rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
     redis_publisher: Arc<RedisPublisher>,
+    message_processing: Arc<RabbitMQ>,
 }
 
 pub async fn start_http_api(
@@ -41,12 +43,14 @@ pub async fn start_http_api(
     db: Arc<PostgresDatabase>,
     rooms_channels: Arc<DashMap<Uuid, broadcast::Sender<Message>>>,
     redis_publisher: Arc<RedisPublisher>,
+    message_processing: Arc<RabbitMQ>,
 ) {
     let auth_state = AppState {
         db,
         jwt_secret,
         rooms_channels,
         redis_publisher,
+        message_processing,
     };
 
     let app = Router::new()
