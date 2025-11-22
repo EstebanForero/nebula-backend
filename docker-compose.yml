@@ -2,15 +2,15 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres:18.1-alpine    # Latest stable: 18.1 (Nov 13, 2025)
+    image: postgres:18.1-alpine
     container_name: nebula-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: nebula
       POSTGRES_USER: nebula
-      POSTGRES_PASSWORD: nebula123  # Change in prod!
+      POSTGRES_PASSWORD: nebula123
     ports:
-      - "5432:5432"                 # Expose for local tools like psql / pgAdmin
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,12 +21,12 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:8.0-alpine        # Latest stable: 8.0 (Nov 4, 2025)
+    image: redis:8.0-alpine
     container_name: nebula-redis
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning  # Basic persistence config
+    command: redis-server --save 60 1 --loglevel warning
     ports:
-      - "6379:6379"                # Expose for redis-cli or clients
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,12 +37,12 @@ services:
       start_period: 5s
 
   rabbitmq:
-    image: rabbitmq:4.1.5-management-alpine  # Latest stable: 4.1.5 (Oct 28, 2025) with management UI
+    image: rabbitmq:4.1.5-management-alpine
     container_name: nebula-rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: nebula
-      RABBITMQ_DEFAULT_PASS: nebula123  # Change in prod!
+      RABBITMQ_DEFAULT_PASS: nebula123
       RABBITMQ_DEFAULT_VHOST: nebula
     ports:
       - "5672:5672"                 # AMQP protocol
@@ -68,32 +68,27 @@ services:
     env_file:
       - .env
     environment:
-      # Bind backend inside the container
       BACKEND_ADDR: 0.0.0.0:3838
 
       DEV_MODE: "true"
 
-      # Override DB / Redis to use Docker service hosts
       DATABASE_URL: postgres://nebula:nebula123@postgres:5432/nebula
       REDIS_URL: redis://redis:6379
 
-      # Rabbit connection details using internal hostnames
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: nebula
       RABBITMQ_PASSWORD: nebula123
       RABBITMQ_VHOST: nebula
 
-      # Optional AMQP_URL if your app uses it
       AMQP_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
 
-      # Host-specific hints if your code uses these
       REDIS_HOST: redis
       REDIS_PORT: 6379
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
     ports:
-      - "3838:3838"                 # Backend HTTP API → http://localhost:3838
+      - "3838:3838"
 
   notification-service:
     image: esteban1930/nebula-notification-service:latest
@@ -105,21 +100,20 @@ services:
     env_file:
       - .env
     environment:
-      # Override infra URLs to use Docker service names, keep the same variable names
       DATABASE_URL: postgres://nebula:nebula123@postgres:5432/nebula
       RABBIT_URL: amqp://nebula:nebula123@rabbitmq:5672/nebula
 
-      # Queue name stays as in your .env
-      RABBIT_QUEUE: room_member.notifications
+      RABBIT_QUEUE: room_member_notifications
 
-      # HTTP port inside the container
       HTTP_PORT: 3010
 
-      # Dev flag
       DEV_MODE: "true"
 
-      # The WEBPUSH_* and JWT_SECRET, RESEND_API_KEY, FROM_EMAIL come from .env
-      # and are not overridden here on purpose so they stay exactly as you defined them.
+      JWT_SECRET: zdwrJg3LTkyhj_zlbNQBKw2d3zruC4I46wfNzuRhGy8qmUwOYOXUnlKYbMZqIzuitxC-xGrhU445lt0vjciVKw
+      WEBPUSH_VAPID_PUBLIC_KEY: BBYxHayr8UXJerM06-l8YNLTxEQA5zS3xW4u29rUXxPZsDsSXDYghf0Pvb8imkub4MboWOzlSvU7XsHhCJHXLz4
+      WEBPUSH_VAPID_PRIVATE_KEY: hBHu_vs1GTEkemLdSdr1RGvALbwa7lnK8nnTe5cOGI8
+      WEBPUSH_VAPID_SUBJECT: mailto:admin@nebula.example.com
+
     ports:
       - "3010:3010"                 # Notification HTTP API → http://localhost:3010
 
@@ -131,19 +125,18 @@ services:
       - backend
       - notification-service
     ports:
-      - "8080:80"                   # Frontend → http://localhost:8080
+      - "8080:80"
     environment:
-      # From the BROWSER pov, backend & notifications are on localhost
       VITE_API_BASE_URL: http://localhost:3838
       VITE_NOTIFICATION_BASE_URL: http://localhost:3010
-      VITE_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY}
+      VITE_VAPID_PUBLIC_KEY: BBYxHayr8UXJerM06-l8YNLTxEQA5zS3xW4u29rUXxPZsDsSXDYghf0Pvb8imkub4MboWOzlSvU7XsHhCJHXLz4
 
   prometheus:
     image: prom/prometheus:latest
     container_name: nebula-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"                 # Prometheus UI → http://localhost:9090
+      - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
@@ -151,7 +144,6 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=7d"
       - "--web.enable-lifecycle"
-    # now that backend is a service, in prometheus.yml use targets: ["backend:3838"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -160,10 +152,10 @@ services:
     container_name: nebula-grafana
     restart: unless-stopped
     ports:
-      - "3050:3000"                 # Grafana UI → http://localhost:3050
+      - "3050:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin   # change in real env
+      GF_SECURITY_ADMIN_PASSWORD: admin
       GF_SERVER_DOMAIN: localhost
       GF_SERVER_ROOT_URL: http://localhost:3050/
     volumes:
