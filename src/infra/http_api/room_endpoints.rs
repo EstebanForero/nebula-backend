@@ -12,7 +12,7 @@ use crate::{
     infra::http_api::AppState,
     use_cases::room_service::{
         create_room, get_all_public_rooms, get_user_rooms_use, join_room, obtain_messages,
-        send_message, user_is_in_room,
+        obtain_room_members, send_message, user_is_in_room,
     },
 };
 
@@ -118,6 +118,16 @@ pub async fn get_messages(
     .await
     {
         Ok(messages) => Ok((StatusCode::OK, Json(messages))),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+    }
+}
+
+pub async fn get_room_members_end(
+    State(state): State<AppState>,
+    Path(room_id): Path<Uuid>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    match obtain_room_members(state.db, room_id).await {
+        Ok(users) => Ok((StatusCode::OK, Json(users))),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
     }
 }

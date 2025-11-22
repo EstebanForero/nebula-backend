@@ -19,10 +19,10 @@ use crate::{
         database::PostgresDatabase,
         http_api::{
             room_endpoints::{
-                create_room_end, get_all_public_rooms_end, get_messages, get_user_rooms_end,
-                join_room_end, send_message_end,
+                create_room_end, get_all_public_rooms_end, get_messages, get_room_members_end,
+                get_user_rooms_end, join_room_end, send_message_end,
             },
-            user_endpoints::{login_end, register_end},
+            user_endpoints::{get_user_info_end, login_end, register_end},
         },
         rabbit_mq::RabbitMQ,
         redis::RedisPublisher,
@@ -66,6 +66,8 @@ pub async fn start_http_api(
         .route("/room", post(create_room_end))
         .route("/room/join/{room_id}", post(join_room_end))
         .route("/message", post(send_message_end).get(get_messages))
+        .route("/me", get(get_user_info_end))
+        .route("/room/members/{room_id}", get(get_room_members_end))
         .route_layer(middleware::from_fn_with_state(
             auth_state.clone(),
             middleware_auth::middleware_fn,

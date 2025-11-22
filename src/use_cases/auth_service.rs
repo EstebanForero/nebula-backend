@@ -78,6 +78,16 @@ pub async fn register(
 
     Ok(())
 }
+
+pub async fn get_user_by_id_use(db: Arc<impl UserDatabase>, user_id: Uuid) -> AuthResult<User> {
+    let user = db
+        .get_user_by_id(user_id)
+        .await
+        .map_err(|err| AuthError::DatabaseError(err.to_string()))?;
+
+    Ok(user)
+}
+
 #[derive(Error, Debug)]
 pub enum AuthError {
     #[error("Failed password hashing: {0}")]
