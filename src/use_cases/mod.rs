@@ -1,5 +1,5 @@
 pub mod auth_service;
-pub mod message_processing;
+pub mod notification_processing;
 pub mod realtime_broker;
 pub mod realtime_service;
 pub mod room_database;

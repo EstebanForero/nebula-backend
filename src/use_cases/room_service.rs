@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     domain::room::{MemberRole, Message, Room, RoomMember, RoomVisibility},
     use_cases::{
-        message_processing::MessageProcessing, realtime_broker::MessagePublisher,
+        notification_processing::MessageProcessing, realtime_broker::MessagePublisher,
         room_database::RoomDatabase,
     },
 };

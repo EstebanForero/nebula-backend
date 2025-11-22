@@ -1,6 +1,6 @@
 use crate::{
     domain::room::Message,
-    use_cases::message_processing::{
+    use_cases::notification_processing::{
         MessageProcessing, MessageProcessingError, MessageProcessingResult,
     },
 };
