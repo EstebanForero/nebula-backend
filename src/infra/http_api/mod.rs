@@ -28,7 +28,6 @@ use crate::{
         redis::RedisPublisher,
         web_socket::ws_handler,
     },
-    use_cases::room_service::{create_room, get_user_rooms_use},
 };
 
 #[derive(Clone)]
