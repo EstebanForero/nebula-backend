@@ -134,7 +134,7 @@ impl RoomDatabase for PostgresDatabase {
     async fn get_user_rooms(&self, user_id: Uuid) -> RoomDatabaseResult<Vec<Room>> {
         let rooms_db = sqlx::query_as!(
             DbRoom,
-            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE id = (SELECT room_id FROM room_members WHERE user_id = $1) ORDER BY created_at DESC",
+            "SELECT id, name, visibility::text, password_hash, created_by, created_at FROM rooms WHERE id IN (SELECT room_id FROM room_members WHERE user_id = $1) ORDER BY created_at DESC",
             user_id
         ).fetch_all(&self.pool).await
             .map_err(|err| RoomDatabaseError::InternalDBError(err.to_string()))?;
