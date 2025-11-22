@@ -201,7 +201,7 @@ impl RoomDatabase for PostgresDatabase {
     async fn get_room_members(&self, room_id: Uuid) -> RoomDatabaseResult<Vec<User>> {
         let users = sqlx::query_as!(
             User,
-            "SELECT * FROM users WHERE id = (SELECT user_id FROM room_members WHERE room_id = $1)",
+            "SELECT * FROM users WHERE id IN (SELECT user_id FROM room_members WHERE room_id = $1)",
             room_id
         )
         .fetch_all(&self.pool)
