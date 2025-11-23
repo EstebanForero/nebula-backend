@@ -61,7 +61,6 @@ export const options = {
     },
 
     // Sender: a single user that only POSTS messages into the room.
-    // Sender does not have a WS connection (you said sender does not receive its own messages).
     ws_sender: {
       executor: 'constant-vus',
       exec: 'wsSenderScenario',
@@ -110,10 +109,8 @@ function buildRoomWsUrl(roomId, token) {
 // ------------------------
 //
 // No fixed identifier/password.
-// Each VU creates a disposable user:
-//   - POST /auth/register
-//   - POST /auth/login
-//   - Login response may be JSON OR plain text token.
+// Each VU creates a disposable user.
+// Login response may be JSON OR plain text token.
 //
 
 function extractTokenFromLoginResponse(res) {
@@ -155,7 +152,6 @@ function createTestUser() {
     },
   );
 
-  // It's OK if registration returns 200/201
   check(registerRes, {
     'register status is 200/201': (r) => r.status === 200 || r.status === 201,
   });
@@ -188,6 +184,11 @@ function createTestUser() {
 // ------------------------
 // ROOM MANAGEMENT HELPERS
 // ------------------------
+//
+// When you create a room you get no body, so:
+// 1) POST /rooms to create it
+// 2) GET /rooms and find it by name
+//
 
 function createRoom(token, roomName) {
   const payload = JSON.stringify({
@@ -202,18 +203,33 @@ function createRoom(token, roomName) {
   });
 
   check(res, {
-    'create room status is 200/201': (r) => r.status === 200 || r.status === 201,
+    'create room status is 200/201/204': (r) =>
+      r.status === 200 || r.status === 201 || r.status === 204,
   });
 
-  let room;
+  // Creator is automatically joined to the room.
+  // Now fetch /rooms (rooms the user belongs to), and find by name.
+  const listRes = http.get(apiUrl('/rooms'), {
+    headers: defaultHeaders(token),
+    tags: { endpoint: 'get_rooms_after_create' },
+  });
+
+  check(listRes, {
+    'get /rooms after create is 200': (r) => r.status === 200,
+  });
+
+  let rooms = [];
   try {
-    room = res.json();
+    rooms = listRes.json();
   } catch (_) {
-    throw new Error('Could not parse create room response as JSON');
+    throw new Error('Could not parse /rooms response as JSON after creating room');
   }
 
-  // IMPORTANT:
-  // Creator user is automatically joined to the room (per your rules).
+  const room = rooms.find((r) => r.name === roomName);
+  if (!room || !room.id) {
+    throw new Error('Could not find created room in /rooms list');
+  }
+
   return room.id;
 }
 
@@ -229,7 +245,6 @@ function joinRoom(token, roomId) {
 
   http_room_join_latency.add(res.timings.duration);
 
-  // Join is allowed only if room exists & user not already in it.
   check(res, {
     'join room is 200/201': (r) => r.status === 200 || r.status === 201,
   });
@@ -238,7 +253,6 @@ function joinRoom(token, roomId) {
 }
 
 function leaveRoom(token, roomId) {
-  // You can only leave if you are already a member.
   const res = http.del(apiUrl(`/rooms/${roomId}/members/me`), null, {
     headers: defaultHeaders(token),
     tags: { endpoint: 'leave_room' },
@@ -267,19 +281,16 @@ function leaveRoom(token, roomId) {
 //
 
 function connectAsReceiver(token, roomId, variantTag) {
-  // User must join the room first to be allowed to receive messages
+  // User must join the room first
   joinRoom(token, roomId);
 
   const wsUrl = buildRoomWsUrl(roomId, token);
 
   ws.connect(wsUrl, {}, function(socket) {
     socket.on('open', function() {
-      // Receiver doesn’t send anything
     });
 
     socket.on('message', function(data) {
-      // Data is expected to be JSON with Message shape:
-      // { id, roomId, senderId, content, createdAt }
       try {
         const msg = JSON.parse(data);
 
@@ -287,7 +298,6 @@ function connectAsReceiver(token, roomId, variantTag) {
           return;
         }
 
-        // Only measure messages that are part of test traffic
         if (msg.content.startsWith('LAT_TEST:')) {
           const parts = msg.content.split(':');
           if (parts.length >= 2) {
@@ -300,18 +310,15 @@ function connectAsReceiver(token, roomId, variantTag) {
           }
         }
       } catch (_) {
-        // Ignore malformed messages
       }
     });
 
     socket.on('error', function() {
-      // Let k6 record the WS error; nothing extra needed
     });
 
-    // Keep connection open for the duration of scenario; safety timeout
     socket.setTimeout(function() {
       socket.close();
-    }, 20000); // 20s per connection
+    }, 20000);
   });
 }
 
@@ -336,21 +343,13 @@ export function setup() {
 // ========================
 // SCENARIO: HTTP ENDPOINT LATENCY
 // ========================
-//
-// - Each iteration:
-//   - Create a fresh user
-//   - Join existing test room
-//   - Call /me, /rooms, /rooms/{id}/messages GET
-//   - Send a message
-//   - Leave room
-//
 
 export function httpEndpointLatencyScenario(data) {
   const { roomId } = data;
 
   const { token } = createTestUser();
 
-  // Join room (required for room-specific endpoints)
+  // Join room
   joinRoom(token, roomId);
 
   // /me
@@ -363,7 +362,7 @@ export function httpEndpointLatencyScenario(data) {
     '/me is 200': (r) => r.status === 200,
   });
 
-  // /rooms (rooms user belongs to)
+  // /rooms
   const roomsRes = http.get(apiUrl('/rooms'), {
     headers: defaultHeaders(token),
     tags: { endpoint: 'rooms' },
@@ -397,7 +396,7 @@ export function httpEndpointLatencyScenario(data) {
     'POST /rooms/{id}/messages is 200/201': (r) => r.status === 200 || r.status === 201,
   });
 
-  // Leave room (only valid because we joined before)
+  // Leave room
   leaveRoom(token, roomId);
 
   sleep(1);
@@ -406,10 +405,6 @@ export function httpEndpointLatencyScenario(data) {
 // ========================
 // SCENARIO: WS RECEIVER (SINGLE USER)
 // ========================
-//
-// 1 receiver, many messages from sender.
-// Measures message_delivery_latency with variant "single_receiver".
-//
 
 export function wsReceiverSingleScenario(data) {
   const { roomId } = data;
@@ -422,10 +417,6 @@ export function wsReceiverSingleScenario(data) {
 // ========================
 // SCENARIO: WS RECEIVERS (MANY USERS)
 // ========================
-//
-// 100 receivers, all listening to messages from the single sender.
-// Measures message_delivery_latency with variant "many_receivers".
-//
 
 export function wsReceiversManyScenario(data) {
   const { roomId } = data;
@@ -439,17 +430,12 @@ export function wsReceiversManyScenario(data) {
 // SCENARIO: WS SENDER
 // ========================
 //
-// Single user that sends messages via HTTP POST only.
-// This user:
-//   - is the room creator (from setup), thus already joined.
-//   - never connects via WS.
-//   - sends messages with content "LAT_TEST:<timestamp_ms>" so receivers can compute latency.
+// Sender just posts messages with "LAT_TEST:<timestamp_ms>".
 //
 
 export function wsSenderScenario(data) {
   const { roomId, senderToken } = data;
 
-  // Send a message every iteration
   const sendTs = Date.now();
   const content = `LAT_TEST:${sendTs}`;
 

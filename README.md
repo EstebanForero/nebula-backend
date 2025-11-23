@@ -1,172 +1,210 @@
-# Nebula Backend - Real-Time Chat Service
+# Nebula Real-Time Chat System
 
-Nebula Backend implements the server-side of a real-time chat application with WebSockets, room management, message persistence, notifications, authentication, and basic observability. This README describes how to run, configure, and test the backend. It is not the full technical document.
+Final Project – Patrones Arquitectónicos Avanzados
+Universidad de La Sabana – 2025
 
-## Features
+Nebula is a real-time chat application designed to demonstrate architectural patterns such as client–server communication, WebSockets, event-driven messaging, horizontal scalability, observability, and asynchronous processing.
+The system fulfills all the functional and non-functional requirements described in the course assignment.
 
-* JWT authentication.
-* Public and private chat rooms.
-* Join and leave rooms.
-* Real-time messaging via WebSockets.
-* Message persistence in PostgreSQL.
-* Paginated message history via REST.
-* User-enter/exit notifications via RabbitMQ.
-* Observability with Prometheus metrics and Grafana dashboards.
-* Deployment through Docker Compose.
+---
 
-## Architecture Overview
+# Overview
 
-Main backend components:
+Nebula consists of a web client, a primary backend service implemented in Rust, and a secondary backend service implemented in Bun/TypeScript responsible for processing notifications. The system integrates multiple infrastructure components including Redis, RabbitMQ, and PostgreSQL.
 
-* Nebula Backend (Rust + Axum + Tokio): REST API, WebSocket server, metrics.
-* PostgreSQL: persistent storage for users, rooms, messages, memberships.
-* RabbitMQ: message broker for notifications.
-* Redis (optional): cache or pub/sub.
-* Notification Service: handles WebPush subscriptions and sends notifications.
-* Prometheus and Grafana: metrics collection and visualization.
+The project supports:
 
-## Requirements
+* Public and private chat rooms
+* JWT-based authentication
+* Paginated message history via REST
+* Real-time message delivery via WebSockets
+* Asynchronous notification processing
+* Horizontal scalability for WebSocket fan-out
+* Persistence of all confirmed messages in PostgreSQL
+* Basic observability: latency metrics, connection metrics, and structured logs
+* Load testing with k6
 
-* Docker and Docker Compose.
-* (Optional) Rust + Cargo for local development without Docker.
+---
 
-## Environment Variables
+# Architecture Summary
 
-Backend (.env example):
+Nebula uses the minimum architecture required:
 
-```
-BACKEND_ADDR=0.0.0.0:3838
-DEV_MODE=true
-DATABASE_URL=postgres://nebula:nebula123@postgres:5432/nebula
-REDIS_URL=redis://redis:6379
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME=nebula
-RABBITMQ_PASSWORD=nebula123
-RABBITMQ_VHOST=nebula
-JWT_SECRET=zdwrJg3LT...
-```
+### Components
 
-Notification service (.env example):
+| Component              | Technology               | Description                                                                                        |
+| ---------------------- | ------------------------ | -------------------------------------------------------------------------------------------------- |
+| Web Client             | React + TypeScript       | Provides UI for authentication, chat, rooms, and notifications.                                    |
+| API + WebSocket Server | Rust (Axum, SQLx, Tokio) | Handles REST endpoints, JWT auth, message persistence, room management, and WebSocket connections. |
+| Notification Service   | Bun + TypeScript         | Consumes RabbitMQ events to process and deliver push notifications.                                |
+| Redis                  | Pub/Sub                  | Used for message fan-out across WebSocket worker instances and room message replication.           |
+| RabbitMQ               | AMQP queue               | Used for asynchronous notification workloads and smoothing traffic spikes.                         |
+| PostgreSQL             | Relational DB            | Stores users, rooms, messages, memberships, and metadata.                                          |
 
-```
-DATABASE_URL=postgres://nebula:nebula123@postgres:5432/nebula
-JWT_SECRET=zdwrJg3LT...
-RABBIT_URL=amqp://nebula:nebula123@rabbitmq:5672/nebula
-RABBIT_QUEUE=room_member.notifications
-RESEND_API_KEY=re_...
-FROM_EMAIL=noreply@nebula.example.com
-WEBPUSH_VAPID_PUBLIC_KEY=...
-WEBPUSH_VAPID_PRIVATE_KEY=...
-WEBPUSH_VAPID_SUBJECT=mailto:admin@nebula.example.com
-HTTP_PORT=3010
-DEV_MODE=true
-```
+### Message Delivery Flow
 
-## Running with Docker Compose
+1. A client sends a message via `POST /rooms/{id}/messages`.
+2. The Rust backend persists the message to PostgreSQL.
+3. The backend publishes the message to Redis Pub/Sub on a room-specific channel.
+4. All WebSocket worker instances subscribed to that channel evaluate:
 
-From the project root:
+   * If the connected client is in the same room
+   * If the connected client is not the sender
+5. Valid WebSocket clients receive the message in real time.
+6. A notification event is published to RabbitMQ so the Bun notification service can handle push notifications asynchronously.
+
+### Access Control
+
+* JWT required for authenticated operations.
+* Public rooms require no password.
+* Private rooms require password verification.
+* Room creators are automatically joined as members.
+* WebSocket connections require a token in the query string.
+
+---
+
+# Repository Structure
 
 ```
-docker compose build
-docker compose up -d
+nebula-frontend/              React client
+nebula-backend/               Rust backend (Axum + SQLx)
+nebula-notification-service/  Bun/TypeScript service (RabbitMQ consumer)
+docker-compose.yml            Local development stack
+k6/nebula_latency.test.js     Load and latency simulation script
 ```
 
-Services availability:
+---
 
-* Backend: [http://localhost:3838](http://localhost:3838)
-* PostgreSQL: localhost:5432
-* Redis: localhost:6379
-* RabbitMQ UI: [http://localhost:15672](http://localhost:15672)
-* Prometheus: [http://localhost:9090](http://localhost:9090)
-* Grafana: [http://localhost:3050](http://localhost:3050)
-* Notification service: [http://localhost:3010](http://localhost:3010)
+# Running Locally (Docker Compose)
 
-To shut down:
+The full development stack can be started using:
 
 ```
-docker compose down
+docker compose up --build
 ```
 
-## REST Endpoints Summary
+This brings up:
 
-Authentication:
+* PostgreSQL
+* Redis
+* RabbitMQ
+* Nebula REST + WebSocket backend (Rust)
+* Notification service (Bun)
+* Optional frontend service (React)
 
-* POST /auth/register
-* POST /auth/login
+Default service endpoints:
 
-User:
+* API: [http://localhost:3838](http://localhost:3838)
+* Notifications: [http://localhost:3010](http://localhost:3010)
+* Frontend: [http://localhost:5173](http://localhost:5173)
 
-* GET /me
+---
 
-Rooms:
+# Running Tests
 
-* GET /rooms/public
-* GET /rooms
-* POST /rooms
+### Rust Backend Tests
 
-Room Membership:
-
-* GET /rooms/{room_id}/members
-* POST /rooms/{room_id}/members
-* DELETE /rooms/{room_id}/members/me
-
-Messages:
-
-* GET /rooms/{room_id}/messages?page=&page_size=
-* POST /rooms/{room_id}/messages
-
-WebSocket:
-
-* GET /ws/rooms/{room_id}?token=<JWT>
-
-Health and Metrics:
-
-* GET /
-* GET /health
-* GET /metrics
-
-Notifications (notification service):
-
-* POST /webpush/subscribe
-
-## Testing
-
-Unit and integration tests:
+Inside `nebula-backend/`:
 
 ```
 cargo test
 ```
 
-If using docker-compose.test.yml:
+This runs unit tests and integration tests, including SQLx query tests and WebSocket logic tests.
+
+### Notification Service Tests
+
+Inside `nebula-notification-service/`:
 
 ```
-docker compose -f docker-compose.test.yml up -d
-cargo test
-docker compose -f docker-compose.test.yml down
+bun test
 ```
 
-## Load Testing
+Tests include subscription parsing, push registration validation, and AMQP consumer behavior (mocked).
 
-Use your preferred test tool (k6, JMeter, simulate.py). Place scripts in a dedicated folder and document usage. Example:
+---
+
+# Load Testing & Latency Validation (k6)
+
+The project includes a full k6 simulation script:
 
 ```
-python scripts/simulate.py --users 50 --rooms 5 --duration 120
+k6/nebula_latency.test.js
 ```
 
-## Observability
+It performs:
 
-Prometheus scrapes backend metrics from /metrics. Grafana provides dashboards for latency, RPS, and error rates. Access Grafana at [http://localhost:3050](http://localhost:3050).
+* Automatic creation of temporary test users
+* One dedicated REST sender
+* One WebSocket receiver
+* One hundred concurrent WebSocket receivers (stress scenario)
+* Measurement of:
 
-## Project Structure (example)
+  * HTTP latency metrics
+  * WebSocket connection times
+  * End-to-end message delivery latency (HTTP POST → WS receive)
 
-nebula-backend/
-src/
-migrations/
-grafana/
-.sqlx/
-docker-compose.yml
-docker-compose.test.yml
-Dockerfile
-Cargo.toml
-README.txt
+### Running the Load Test
+
+```
+k6 run k6/nebula_latency.test.js
+```
+
+An HTML report is generated after completion:
+
+```
+nebula-latency-report.html
+```
+
+---
+
+# Performance Results
+
+The non-functional requirement specifies:
+
+* **Support for “dozens” of simultaneous users**
+* **Message delivery latency below 850 ms**
+
+The system was tested with **100 concurrent WebSocket receivers**, exceeding the "dozens" requirement.
+
+### Real-Time Message Delivery Latency
+
+Measured using the end-to-end metric (`POST` → `WebSocket receive`):
+
+| Metric          | Result                  |
+| --------------- | ----------------------- |
+| Average latency | **24.58 ms**            |
+| p90             | **71.00 ms**            |
+| p95             | **239.00 ms**           |
+| Max             | 240 ms (single outlier) |
+
+All latency results are **well below the 850 ms requirement**, even at 100 concurrent WebSocket clients.
+
+### HTTP Latencies
+
+Key endpoints also satisfied performance expectations:
+
+| Endpoint                    | Average                                                          | p90     | p95     |
+| --------------------------- | ---------------------------------------------------------------- | ------- | ------- |
+| `/me`                       | 0.60 ms                                                          | 0.76 ms | 0.94 ms |
+| `/rooms`                    | 0.58 ms                                                          | 0.72 ms | 0.90 ms |
+| `GET /rooms/{id}/messages`  | 0.67 ms                                                          | 1.07 ms | 1.11 ms |
+| `POST /rooms/{id}/messages` | 5.29 ms median, variable under load but within acceptable ranges |         |         |
+
+### Room Join
+
+Room join requires validation, password handling, membership checks, and redis operations, so it is expectedly heavier:
+
+* Average join time: **727.68 ms**
+
+Still within acceptable limits and only done once per user.
+
+---
+
+# Metrics Summary
+
+Insert metrics image(s) here:
+
+```
+[metric image here]
+```
