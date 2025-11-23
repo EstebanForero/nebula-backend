@@ -45,8 +45,8 @@ services:
       RABBITMQ_DEFAULT_PASS: nebula123
       RABBITMQ_DEFAULT_VHOST: nebula
     ports:
-      - "5672:5672"                 # AMQP protocol
-      - "15672:15672"               # Management UI → http://localhost:15672
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -87,8 +87,6 @@ services:
       REDIS_PORT: 6379
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-    ports:
-      - "3838:3838"
 
   notification-service:
     image: esteban1930/nebula-notification-service:latest
@@ -114,9 +112,6 @@ services:
       WEBPUSH_VAPID_PRIVATE_KEY: hBHu_vs1GTEkemLdSdr1RGvALbwa7lnK8nnTe5cOGI8
       WEBPUSH_VAPID_SUBJECT: mailto:admin@nebula.example.com
 
-    ports:
-      - "3010:3010"                 # Notification HTTP API → http://localhost:3010
-
   frontend:
     image: esteban1930/nebula-frontend:latest
     container_name: nebula-frontend
@@ -124,19 +119,15 @@ services:
     depends_on:
       - backend
       - notification-service
-    ports:
-      - "8080:80"
     environment:
-      VITE_API_BASE_URL: http://localhost:3838
-      VITE_NOTIFICATION_BASE_URL: http://localhost:3010
+      VITE_API_BASE_URL: http://backend:3838
+      VITE_NOTIFICATION_BASE_URL: http://notification-service:3010
       VITE_VAPID_PUBLIC_KEY: BBYxHayr8UXJerM06-l8YNLTxEQA5zS3xW4u29rUXxPZsDsSXDYghf0Pvb8imkub4MboWOzlSvU7XsHhCJHXLz4
 
   prometheus:
     image: prom/prometheus:latest
     container_name: nebula-prometheus
     restart: unless-stopped
-    ports:
-      - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
@@ -152,18 +143,33 @@ services:
     container_name: nebula-grafana
     restart: unless-stopped
     ports:
-      - "3050:3000"
+      - "8080:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_SERVER_DOMAIN: localhost
-      GF_SERVER_ROOT_URL: http://localhost:3050/
+      GF_SERVER_ROOT_URL: http://localhost:8080/
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
+
+  nginx:
+    image: nginx:alpine
+    container_name: nebula-nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+      - notification-service
+      - prometheus
+      - grafana
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
 
 volumes:
   postgres_data:
