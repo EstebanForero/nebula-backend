@@ -94,9 +94,9 @@ This brings up:
 
 Default service endpoints:
 
-* API: [http://localhost:3838](http://localhost:3838)
-* Notifications: [http://localhost:3010](http://localhost:3010)
-* Frontend: [http://localhost:5173](http://localhost:5173)
+* API: [http://localhost/api/backend(http://localhost/api/backend)
+* Notifications: [http://localhost/api/notifications](http://localhost/api/notifications)
+* Frontend: [http://localhost(http://localhost)
 
 ---
 
