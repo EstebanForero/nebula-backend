@@ -63,8 +63,30 @@ pub async fn register(
     password: String,
     email: String,
 ) -> AuthResult<()> {
-    let encrypted_password = hash(password, DEFAULT_COST)
+    let encrypted_password = hash(&password, DEFAULT_COST)
         .map_err(|err| AuthError::PasswordHashingFailed(err.to_string()))?;
+
+    if username.is_empty() {
+        return Err(AuthError::InvalidUsernameError(
+            "The username is empty".to_string(),
+        ));
+    }
+
+    if password.is_empty() {
+        return Err(AuthError::InvalidUsernameError(
+            "The username is empty".to_string(),
+        ));
+    }
+
+    if !password.chars().any(|char| char.is_ascii_digit()) {
+        return Err(AuthError::InvalidPasswordError(
+            "The password must contain a digit".to_string(),
+        ));
+    } else if password.len() < 8 {
+        return Err(AuthError::InvalidPasswordError(
+            "The lenght of the password must be 8, or greater than 8".to_string(),
+        ));
+    }
 
     let user = User {
         id: Uuid::new_v4(),
@@ -75,10 +97,10 @@ pub async fn register(
         updated_at: Utc::now(),
     };
 
-    database
-        .create_user(user)
-        .await
-        .map_err(|err| AuthError::DatabaseError(err.to_string()))?;
+    database.create_user(user).await.map_err(|err| {
+        error!("Create user query database error: {err}");
+        AuthError::AlreadyExisting("Username already exists".to_string())
+    })?;
 
     Ok(())
 }
@@ -104,6 +126,12 @@ pub enum AuthError {
     InvalidCredentials,
     #[error("encode token Error")]
     EncodingTokenError,
+    #[error("Invalid username error: {0}")]
+    InvalidUsernameError(String),
+    #[error("Invalid password error: {0}")]
+    InvalidPasswordError(String),
+    #[error("Already existing identifier: {0}")]
+    AlreadyExisting(String),
 }
 
 #[cfg(test)]
@@ -129,14 +157,14 @@ mod test {
         let mut db = MockUserDatabase::new();
 
         db.expect_create_user()
-            .withf(|user| verify("password123", &user.password_hash).unwrap_or(false))
+            .withf(|user| verify("password123*", &user.password_hash).unwrap_or(false))
             .once()
             .returning(|_| Ok(()));
 
         register(
             Arc::new(db),
             "juan".to_string(),
-            "password123".to_string(),
+            "password123*".to_string(),
             "juan@juan.juan".to_string(),
         )
         .await
