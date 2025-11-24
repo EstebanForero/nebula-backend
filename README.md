@@ -41,6 +41,9 @@ Nebula uses the minimum architecture required:
 | RabbitMQ               | AMQP queue               | Used for asynchronous notification workloads and smoothing traffic spikes.                         |
 | PostgreSQL             | Relational DB            | Stores users, rooms, messages, memberships, and metadata.                                          |
 
+<img width="871" height="534" alt="image" src="https://github.com/user-attachments/assets/39c5f4f1-ade1-4fd9-a33d-f73c4651f553" />
+
+
 ### Message Delivery Flow
 
 1. A client sends a message via `POST /rooms/{id}/messages`.
@@ -52,6 +55,8 @@ Nebula uses the minimum architecture required:
    * If the connected client is not the sender
 5. Valid WebSocket clients receive the message in real time.
 6. A notification event is published to RabbitMQ so the Bun notification service can handle push notifications asynchronously.
+
+<img width="1395" height="893" alt="flow-diagram" src="https://github.com/user-attachments/assets/49f585b1-ae65-4062-b49d-f5132832f8ef" />
 
 ### Access Control
 
@@ -213,8 +218,5 @@ Still within acceptable limits and only done once per user.
 
 # Metrics Summary
 
-Insert metrics image(s) here:
+<img width="1733" height="1780" alt="image" src="https://github.com/user-attachments/assets/01b0a7f7-7bc6-4cf5-835c-8ed58bc21762" />
 
-```
-[metric image here]
-```
