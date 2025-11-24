@@ -120,8 +120,8 @@ services:
       - backend
       - notification-service
     environment:
-      VITE_API_BASE_URL: http://backend:3838
-      VITE_NOTIFICATION_BASE_URL: http://notification-service:3010
+      # VITE_API_BASE_URL: http://backend:3838 The frontend should be able to derive the base url
+      # VITE_NOTIFICATION_BASE_URL: http://notification-service:3010
       VITE_VAPID_PUBLIC_KEY: BBYxHayr8UXJerM06-l8YNLTxEQA5zS3xW4u29rUXxPZsDsSXDYghf0Pvb8imkub4MboWOzlSvU7XsHhCJHXLz4
 
   prometheus:
