@@ -112,6 +112,16 @@ cargo test
 
 This runs unit tests and integration tests, including SQLx query tests and WebSocket logic tests.
 
+### Integration Tests (Docker)
+
+Inside `nebula-backend/`:
+
+```
+./test/run_integration.sh
+```
+
+This spins up the ephemeral test stack defined in `docker-compose.test.yml` (Postgres on 55432, Redis on 36379, RabbitMQ on 5674/15674), runs the auth/room integration suites serially, and tears everything down. Use `TEST_DATABASE_URL`, `TEST_REDIS_URL`, and `TEST_JWT_SECRET` to override defaults if needed.
+
 ### Notification Service Tests
 
 Inside `nebula-notification-service/`:

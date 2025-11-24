@@ -30,6 +30,9 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.20"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
+[dev-dependencies]
+serial_test = "3.1.1"
+
 [[test]]
 name = "auth_flow"
 path = "test/auth_flow.rs"
