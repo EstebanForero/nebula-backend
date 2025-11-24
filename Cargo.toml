@@ -29,3 +29,11 @@ tower-http = { version = "0.6.6", features = ["cors"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.20"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
+
+[[test]]
+name = "auth_flow"
+path = "test/auth_flow.rs"
+
+[[test]]
+name = "room_flow"
+path = "test/room_flow.rs"
