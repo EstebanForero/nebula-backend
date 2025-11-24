@@ -107,15 +107,21 @@ Default service endpoints:
 
 # Running Tests
 
-### Rust Backend Tests
+## Rust Backend Tests
+
+### Unit tests
 
 Inside `nebula-backend/`:
 
 ```
+export SQLX_OFFLINE=true 
 cargo test
 ```
 
-This runs unit tests and integration tests, including SQLx query tests and WebSocket logic tests.
+<img width="734" height="893" alt="image" src="https://github.com/user-attachments/assets/eda89167-743f-4472-98df-45b83560578b" />
+
+
+This runs unit tests.
 
 ### Integration Tests (Docker)
 
@@ -127,7 +133,14 @@ Inside `nebula-backend/`:
 
 This spins up the ephemeral test stack defined in `docker-compose.test.yml` (Postgres on 55432, Redis on 36379, RabbitMQ on 5674/15674), runs the auth/room integration suites serially, and tears everything down. Use `TEST_DATABASE_URL`, `TEST_REDIS_URL`, and `TEST_JWT_SECRET` to override defaults if needed.
 
-### Notification Service Tests
+<img width="478" height="170" alt="image" src="https://github.com/user-attachments/assets/88940948-8daf-44d6-ae62-f15d95bef756" />
+
+<img width="575" height="311" alt="image" src="https://github.com/user-attachments/assets/76645539-e4ad-4847-a8c8-66ebcb118c85" />
+
+
+## Notification Service Tests
+
+### Unit tests
 
 Inside `nebula-notification-service/`:
 
@@ -135,7 +148,21 @@ Inside `nebula-notification-service/`:
 bun test
 ```
 
+<img width="812" height="557" alt="image" src="https://github.com/user-attachments/assets/5c51074a-f14c-437a-9f25-2febafdecbf2" />
+
+
 Tests include subscription parsing, push registration validation, and AMQP consumer behavior (mocked).
+
+### Integration tests
+
+Integration (starts Postgres/RabbitMQ via Compose, runs tests locally, then tears down): 
+
+```
+bun run test:integration:docker
+```
+
+<img width="722" height="522" alt="image" src="https://github.com/user-attachments/assets/def193cf-c08b-4861-9406-e6f16f370699" />
+
 
 ---
 
